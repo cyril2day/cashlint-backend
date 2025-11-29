@@ -4,8 +4,8 @@
   "type": "module",
   "description": "Cashlint is a simple bookkeeping tool designed around accrual accounting principles. It supports invoices, bills, loans, and owner equity tracking in a clean workflow",
   "scripts": {
-    "test": "vitest",
-    "test:watch": "vitest --watch",
+    "test:unit": "vitest --watch --project unit",
+    "test:integration": "vitest run --project integration",
     "dev": "ts-node src/api/server.ts",
     "build": "tsc"
   },
@@ -14,15 +14,20 @@
   "license": "MIT",
   "packageManager": "pnpm@10.24.0",
   "dependencies": {
+    "@prisma/adapter-mariadb": "^7.0.1",
+    "@prisma/client": "^7.0.1",
+    "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
     "ramda": "^0.32.0",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.5",
     "@types/node": "^24.10.1",
     "@types/ramda": "^0.31.1",
     "@types/supertest": "^6.0.3",
+    "prisma": "^7.0.1",
     "supertest": "^7.1.4",
     "ts-node": "^10.9.2",
     "vitest": "^4.0.14"
