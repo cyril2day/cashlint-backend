@@ -1,0 +1,33 @@
+{
+  "name": "cashlint-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Cashlint is a simple bookkeeping tool designed around accrual accounting principles. It supports invoices, bills, loans, and owner equity tracking in a clean workflow",
+  "scripts": {
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "dev": "ts-node src/api/server.ts",
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.24.0",
+  "dependencies": {
+    "express": "^5.1.0",
+    "ramda": "^0.32.0",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.1",
+    "@types/ramda": "^0.31.1",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4",
+    "ts-node": "^10.9.2",
+    "vitest": "^4.0.14"
+  },
+  "_moduleAliases": {
+    "@": "src"
+  }
+}
