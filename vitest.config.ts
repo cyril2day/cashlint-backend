@@ -10,6 +10,22 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['src/tests/**/*.{test,spec}.ts'],
-  },
+    pool: 'threads',
+    projects: [
+      {
+        extends: true,
+        test:{
+          name: 'integration',
+          include: ['tests/integration/**/*.{spec,test}.ts']
+        }
+      },
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['src/**/*.{spec,test}.ts']
+        }
+      }
+    ]
+  }
 })
