@@ -12,21 +12,15 @@ const safeDbCall = async <T>(promise: Promise<T>): Promise<Result<T>> => {
       return Failure(InfrastructureFailure('DuplicateKey', 'Username already exists'))
     }
 
-    // Generic DB failure
     return Failure(InfrastructureFailure('DatabaseError', e.message || 'Unknown DB error', e))
   }
 }
 
 
-/**
- * Persists a new user to the database. This is an ACTION (Impure).
- */
 export const createUser = (username: string): Promise<Result<User>> => {
-  // 1. Define the Action (Prisma Promise)
   const action = prisma.user.create({ 
     data: { username } 
   })
 
-  // 2. Execute safely using the functional wrapper
   return safeDbCall(action)
 }
