@@ -16,14 +16,21 @@ export default defineConfig({
         extends: true,
         test:{
           name: 'integration',
-          include: ['tests/integration/**/*.{spec,test}.ts']
+          include: [
+            'src/**/infrastructure/*.{spec,test}.ts',
+            'src/**/application/*.{spec,test}.ts',
+          ],
         }
       },
       {
         extends: true,
         test: {
           name: 'unit',
-          include: ['src/**/*.{spec,test}.ts']
+          include: ['src/**/*.{spec,test}.ts'],
+          exclude: [
+            'src/**/infrastructure/*.{spec,test}.ts',
+            'src/**/application/*.{spec,test}.ts',
+          ],
         }
       }
     ]
