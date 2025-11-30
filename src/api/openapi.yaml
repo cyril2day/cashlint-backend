@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: Cashlint API
+  version: 1.0.0
+  description: Accrual-based Accounting App
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+        username:
+          type: string
+          description: Normalized lowercase username (alphanumeric + underscores)
+        createdAt:
+          type: string
+          format: date-time
+          description: User creation timestamp
+      required:
+        - id
+        - username
+        - createdAt
+
+    CreateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Username to create (will be normalized to lowercase)
+          example: "valid_user_123"
+      required:
+        - username
+
+    CreateUserResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        message:
+          type: string
+          example: "User created successfully"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [DomainFailure, InfrastructureFailure, ApplicationFailure]
+            subtype:
+              type: string
+            message:
+              type: string
+          required:
+            - type
+            - subtype
+            - message
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "ok"
+        context:
+          type: string
+          example: "identity"
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - status
+        - context
+        - timestamp
+
+security:
+  - cookieAuth: []
+paths:
+  /api/users:
+    post:
+      summary: Create a new user
+      description: Create a user with a unique username. Username must be alphanumeric with underscores, minimum 3 characters, and will be normalized to lowercase.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateUserResponse'
+        '400':
+          description: Invalid username (domain validation failed) or missing required field
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/health:
+    get:
+      summary: Identity context health check
+      description: Health check endpoint for identity routes
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
