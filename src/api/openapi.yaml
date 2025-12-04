@@ -10,6 +10,7 @@ components:
       in: cookie
       name: session
   schemas:
+    # Identity Context
     User:
       type: object
       properties:
@@ -48,6 +49,472 @@ components:
           type: string
           example: "User created successfully"
 
+    ListUsersResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        count:
+          type: integer
+          description: Total number of users returned
+        skip:
+          type: integer
+          description: Pagination offset used
+        take:
+          type: integer
+          description: Pagination limit used
+      required:
+        - users
+        - count
+
+    # Ledger Context
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique account identifier
+        userId:
+          type: string
+          description: User who owns this account
+        code:
+          type: string
+          description: Account code (numeric with optional dot)
+          example: "101"
+        name:
+          type: string
+          description: Account name
+          example: "Cash"
+        type:
+          type: string
+          enum: [Asset, Liability, Equity, Revenue, Expense]
+          description: Account type
+        normalBalance:
+          type: string
+          enum: [Debit, Credit]
+          description: Normal balance side
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+      required:
+        - id
+        - userId
+        - code
+        - name
+        - type
+        - normalBalance
+        - createdAt
+        - updatedAt
+
+    CreateAccountRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: User ID (must match authenticated user)
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        code:
+          type: string
+          description: Account code (numeric, up to 20 chars)
+          example: "101"
+        name:
+          type: string
+          description: Account name (1-100 chars)
+          example: "Cash"
+        type:
+          type: string
+          enum: [Asset, Liability, Equity, Revenue, Expense]
+          description: Account type
+          example: "Asset"
+        normalBalance:
+          type: string
+          enum: [Debit, Credit]
+          description: Normal balance side
+          example: "Debit"
+      required:
+        - userId
+        - code
+        - name
+        - type
+        - normalBalance
+
+    CreateAccountResponse:
+      type: object
+      properties:
+        account:
+          $ref: '#/components/schemas/Account'
+        message:
+          type: string
+          example: "Account created successfully"
+
+    JournalLine:
+      type: object
+      properties:
+        accountId:
+          type: string
+          description: ID of the account being debited or credited
+          example: "550e8400-e29b-41d4-a716-446655440001"
+        amount:
+          type: number
+          format: decimal
+          description: Positive amount (up to two decimal places)
+          example: 100.50
+        side:
+          type: string
+          enum: [Debit, Credit]
+          description: Debit or credit side
+      required:
+        - accountId
+        - amount
+        - side
+
+    JournalEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique journal entry identifier
+        userId:
+          type: string
+          description: User who owns this entry
+        entryNumber:
+          type: string
+          description: Optional user‑assigned entry number
+          example: "JE‑2025‑001"
+        description:
+          type: string
+          description: Description of the transaction
+          example: "Paid rent for January"
+        date:
+          type: string
+          format: date-time
+          description: Effective date of the entry
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/JournalLine'
+          description: List of debit and credit lines
+        createdAt:
+          type: string
+          format: date-time
+          description: Entry creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+      required:
+        - id
+        - userId
+        - description
+        - date
+        - lines
+        - createdAt
+        - updatedAt
+
+    PostJournalEntryRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: User ID (must match authenticated user)
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        entryNumber:
+          type: string
+          description: Optional user‑assigned entry number
+          example: "JE‑2025‑001"
+        description:
+          type: string
+          description: Description of the transaction (1‑500 chars)
+          example: "Paid rent for January"
+        date:
+          type: string
+          format: date-time
+          description: Effective date (ISO 8601)
+          example: "2025-01-15T00:00:00Z"
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/JournalLine'
+          description: At least two lines, total debits must equal total credits
+      required:
+        - userId
+        - description
+        - date
+        - lines
+
+    PostJournalEntryResponse:
+      type: object
+      properties:
+        journalEntry:
+          $ref: '#/components/schemas/JournalEntry'
+        message:
+          type: string
+          example: "Journal entry posted successfully"
+
+    # Sales Context
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique customer identifier
+        userId:
+          type: string
+          description: User who owns this customer record
+        name:
+          type: string
+          description: Customer name (company or individual)
+        email:
+          type: string
+          format: email
+          description: Customer email address
+        balance:
+          type: number
+          format: decimal
+          description: Current subsidiary balance (Accounts Receivable)
+          example: 1500.00
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - name
+        - balance
+        - createdAt
+
+    SalesInvoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        customerId:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+          description: User-assigned invoice number
+        total:
+          type: number
+          format: decimal
+          description: Invoice total amount
+        status:
+          type: string
+          enum: [Draft, Issued, PartiallyPaid, Paid, Overdue]
+        date:
+          type: string
+          format: date-time
+          description: Invoice date
+        dueDate:
+          type: string
+          format: date-time
+          description: Payment due date
+        description:
+          type: string
+          description: Optional description
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - customerId
+        - total
+        - status
+        - date
+        - createdAt
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: decimal
+        date:
+          type: string
+          format: date-time
+        method:
+          type: string
+          enum: [Cash, Check, CreditCard, BankTransfer]
+        reference:
+          type: string
+          description: Payment reference number
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - invoiceId
+        - amount
+        - date
+        - method
+        - createdAt
+
+    # Purchasing Context
+    Vendor:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        balance:
+          type: number
+          format: decimal
+          description: Current subsidiary balance (Accounts Payable)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - name
+        - balance
+        - createdAt
+
+    VendorBill:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        vendorId:
+          type: string
+          format: uuid
+        billNumber:
+          type: string
+        amount:
+          type: number
+          format: decimal
+        date:
+          type: string
+          format: date-time
+        dueDate:
+          type: string
+          format: date-time
+        description:
+          type: string
+        status:
+          type: string
+          enum: [Draft, Recorded, PartiallyPaid, Paid]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - vendorId
+        - amount
+        - date
+        - status
+        - createdAt
+
+    # PeriodClose Context
+    Period:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        name:
+          type: string
+          description: Period name (e.g., "January 2025")
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [Open, Closed]
+        closedAt:
+          type: string
+          format: date-time
+          description: When the period was closed
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - name
+        - startDate
+        - endDate
+        - status
+        - createdAt
+
+    # Reporting Context
+    FinancialStatement:
+      type: object
+      properties:
+        period:
+          type: string
+          description: Period covered (e.g., "Q1 2025")
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        generatedAt:
+          type: string
+          format: date-time
+        data:
+          type: object
+          additionalProperties: true
+      required:
+        - period
+        - startDate
+        - endDate
+        - generatedAt
+        - data
+
+    # Common Response Schemas
     ErrorResponse:
       type: object
       properties:
@@ -83,9 +550,54 @@ components:
         - context
         - timestamp
 
+    ListAccountsResponse:
+      type: object
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Account'
+        count:
+          type: integer
+          description: Total number of accounts returned
+      required:
+        - accounts
+        - count
+
+    GetAccountResponse:
+      type: object
+      properties:
+        account:
+          $ref: '#/components/schemas/Account'
+      required:
+        - account
+
+    ListJournalEntriesResponse:
+      type: object
+      properties:
+        journalEntries:
+          type: array
+          items:
+            $ref: '#/components/schemas/JournalEntry'
+        count:
+          type: integer
+          description: Total number of journal entries returned
+      required:
+        - journalEntries
+        - count
+
+    GetJournalEntryResponse:
+      type: object
+      properties:
+        journalEntry:
+          $ref: '#/components/schemas/JournalEntry'
+      required:
+        - journalEntry
+
 security:
   - cookieAuth: []
 paths:
+  # Identity Context
   /api/users:
     post:
       summary: Create a new user
@@ -121,11 +633,1169 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: List users (admin use)
+      description: Retrieve a paginated list of users. Requires admin privileges.
+      parameters:
+        - name: skip
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          description: Pagination offset (default 0)
+        - name: take
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Pagination limit (default 20, max 100)
+        - name: username
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by username (partial match)
+      responses:
+        '200':
+          description: List of users retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListUsersResponse'
+        '401':
+          description: Unauthorized - admin privileges required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/users/health:
     get:
       summary: Identity context health check
       description: Health check endpoint for identity routes
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  # Ledger Context
+  /api/ledger/accounts:
+    post:
+      summary: Create a new account
+      description: Create an account in the user's chart of accounts. Account code must be unique per user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAccountResponse'
+        '400':
+          description: Validation error (invalid code, name, type, or normalBalance)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Duplicate account code for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: List accounts for a user
+      description: Retrieve all accounts belonging to the authenticated user, ordered by account code.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID (must match authenticated user)
+      responses:
+        '200':
+          description: List of accounts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListAccountsResponse'
+        '400':
+          description: Missing or invalid userId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/ledger/journal-entries:
+    post:
+      summary: Post a new journal entry
+      description: Record a double‑entry journal entry. Must be balanced (total debits = total credits) and reference existing accounts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostJournalEntryRequest'
+      responses:
+        '201':
+          description: Journal entry posted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostJournalEntryResponse'
+        '400':
+          description: Validation error (unbalanced, insufficient lines, invalid description, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: One or more referenced accounts not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: List journal entries for a user
+      description: Retrieve journal entries for the authenticated user, ordered by date descending.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID (must match authenticated user)
+        - name: skip
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          description: Pagination offset (default 0)
+        - name: take
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Pagination limit (default 20, max 100)
+      responses:
+        '200':
+          description: Journal entries retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListJournalEntriesResponse'
+        '400':
+          description: Missing or invalid userId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/ledger/accounts/{accountId}:
+    get:
+      summary: Retrieve a specific account by ID
+      description: Fetch a single account by its ID, ensuring it belongs to the authenticated user.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID (must match authenticated user)
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Account ID to retrieve
+      responses:
+        '200':
+          description: Account retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetAccountResponse'
+        '400':
+          description: Missing or invalid userId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Account not found or does not belong to the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/ledger/journal-entries/{entryId}:
+    get:
+      summary: Retrieve a specific journal entry by ID
+      description: Fetch a single journal entry by its ID, ensuring it belongs to the authenticated user.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID (must match authenticated user)
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Journal entry ID to retrieve
+      responses:
+        '200':
+          description: Journal entry retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetJournalEntryResponse'
+        '400':
+          description: Missing or invalid userId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Journal entry not found or does not belong to the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/ledger/health:
+    get:
+      summary: Ledger context health check
+      description: Health check endpoint for ledger routes
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  # Sales Context
+  /api/sales/customers:
+    post:
+      summary: Create a new customer
+      description: Create a customer record for the authenticated user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                email:
+                  type: string
+                  format: email
+              required:
+                - userId
+                - name
+      responses:
+        '201':
+          description: Customer created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customer:
+                    $ref: '#/components/schemas/Customer'
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: List customers
+      description: Retrieve customers for the authenticated user.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: skip
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - name: take
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Customer'
+                  count:
+                    type: integer
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales/customers/{customerId}:
+    get:
+      summary: Get customer by ID
+      description: Retrieve a specific customer by ID.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Customer found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customer:
+                    $ref: '#/components/schemas/Customer'
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales/invoices:
+    post:
+      summary: Issue a sales invoice
+      description: Create a sales invoice for a customer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                customerId:
+                  type: string
+                  format: uuid
+                invoiceNumber:
+                  type: string
+                total:
+                  type: number
+                  minimum: 0.01
+                date:
+                  type: string
+                  format: date-time
+                dueDate:
+                  type: string
+                  format: date-time
+                description:
+                  type: string
+              required:
+                - userId
+                - customerId
+                - total
+                - date
+      responses:
+        '201':
+          description: Invoice created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invoice:
+                    $ref: '#/components/schemas/SalesInvoice'
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Customer not found
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales/invoices/{invoiceId}/payments:
+    post:
+      summary: Apply payment to invoice
+      description: Record a payment against a sales invoice.
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: number
+                  minimum: 0.01
+                date:
+                  type: string
+                  format: date-time
+                method:
+                  type: string
+                  enum: [Cash, Check, CreditCard, BankTransfer]
+                reference:
+                  type: string
+              required:
+                - userId
+                - amount
+                - date
+                - method
+      responses:
+        '201':
+          description: Payment applied successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Invoice not found or does not belong to user
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales/cash-sales:
+    post:
+      summary: Record a cash sale
+      description: Record revenue earned immediately (cash sale/work finished today).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                customerId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: number
+                  minimum: 0.01
+                date:
+                  type: string
+                  format: date-time
+                description:
+                  type: string
+              required:
+                - userId
+                - amount
+                - date
+      responses:
+        '201':
+          description: Cash sale recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cashSale:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales/customer-deposits:
+    post:
+      summary: Record customer deposit
+      description: Record advance/deposit for future work (goes to Unearned Revenue liability).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                customerId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: number
+                  minimum: 0.01
+                date:
+                  type: string
+                  format: date-time
+                description:
+                  type: string
+              required:
+                - userId
+                - amount
+                - date
+      responses:
+        '201':
+          description: Customer deposit recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deposit:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  # Purchasing Context
+  /api/purchasing/vendors:
+    post:
+      summary: Create a new vendor
+      description: Create a vendor record for the authenticated user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                email:
+                  type: string
+                  format: email
+              required:
+                - userId
+                - name
+      responses:
+        '201':
+          description: Vendor created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vendor:
+                    $ref: '#/components/schemas/Vendor'
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: List vendors
+      description: Retrieve vendors for the authenticated user.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: skip
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - name: take
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: List of vendors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vendors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vendor'
+                  count:
+                    type: integer
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/purchasing/vendor-bills:
+    post:
+      summary: Record a vendor bill
+      description: Record a bill from a vendor for goods/services received.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                vendorId:
+                  type: string
+                  format: uuid
+                billNumber:
+                  type: string
+                amount:
+                  type: number
+                  minimum: 0.01
+                date:
+                  type: string
+                  format: date-time
+                dueDate:
+                  type: string
+                  format: date-time
+                description:
+                  type: string
+              required:
+                - userId
+                - vendorId
+                - amount
+                - date
+      responses:
+        '201':
+          description: Vendor bill recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bill:
+                    $ref: '#/components/schemas/VendorBill'
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Vendor not found
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/purchasing/loan-payments:
+    post:
+      summary: Record a loan payment
+      description: Record a loan payment with principal and interest split.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                vendorId:
+                  type: string
+                  format: uuid
+                principalAmount:
+                  type: number
+                  minimum: 0
+                interestAmount:
+                  type: number
+                  minimum: 0
+                date:
+                  type: string
+                  format: date-time
+                description:
+                  type: string
+              required:
+                - userId
+                - vendorId
+                - principalAmount
+                - interestAmount
+                - date
+      responses:
+        '201':
+          description: Loan payment recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loanPayment:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Vendor not found
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/purchasing/cash-expenses:
+    post:
+      summary: Record a cash expense
+      description: Record a one-time cash expense (money out).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                vendorId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: number
+                  minimum: 0.01
+                date:
+                  type: string
+                  format: date-time
+                expenseCategory:
+                  type: string
+                description:
+                  type: string
+              required:
+                - userId
+                - amount
+                - date
+                - expenseCategory
+      responses:
+        '201':
+          description: Cash expense recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cashExpense:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  # PeriodClose Context
+  /api/period-close/manual-journal-entries:
+    post:
+      summary: Post a manual adjusting journal entry
+      description: Record a manual adjusting entry for period-end adjustments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostJournalEntryRequest'
+      responses:
+        '201':
+          description: Manual journal entry posted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  journalEntry:
+                    $ref: '#/components/schemas/JournalEntry'
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/period-close/periods:
+    get:
+      summary: List accounting periods
+      description: Retrieve accounting periods for the authenticated user.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Open, Closed]
+      responses:
+        '200':
+          description: List of periods
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  periods:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Period'
+                  count:
+                    type: integer
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/period-close/periods/{periodId}/close:
+    post:
+      summary: Close an accounting period
+      description: Close a period, preventing further modifications.
+      parameters:
+        - name: periodId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+              required:
+                - userId
+      responses:
+        '200':
+          description: Period closed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    $ref: '#/components/schemas/Period'
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Period not found
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  # Reporting Context (read-only)
+  /api/reporting/income-statement:
+    get:
+      summary: Generate income statement
+      description: Generate an income statement for a given period.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Income statement generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialStatement'
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/reporting/balance-sheet:
+    get:
+      summary: Generate balance sheet
+      description: Generate a balance sheet as of a specific date.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: asOfDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Balance sheet generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialStatement'
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/reporting/owners-equity:
+    get:
+      summary: Generate statement of owner's equity
+      description: Generate a statement of owner's equity for a given period.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Statement generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialStatement'
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  /api/reporting/cash-flow:
+    get:
+      summary: Generate statement of cash flows
+      description: Generate a statement of cash flows for a given period.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Statement generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialStatement'
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
+
+  # Health endpoints for new contexts
+  /api/sales/health:
+    get:
+      summary: Sales context health check
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/purchasing/health:
+    get:
+      summary: Purchasing context health check
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/period-close/health:
+    get:
+      summary: PeriodClose context health check
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/reporting/health:
+    get:
+      summary: Reporting context health check
       responses:
         '200':
           description: Health status
