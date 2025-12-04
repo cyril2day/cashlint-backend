@@ -11,6 +11,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     pool: 'threads',
+    maxWorkers: 1,
     projects: [
       {
         extends: true,
@@ -19,6 +20,7 @@ export default defineConfig({
           include: [
             'src/**/infrastructure/*.{spec,test}.ts',
             'src/**/application/*.{spec,test}.ts',
+            'src/api/**/*{spec,test}.ts'
           ],
         }
       },
@@ -30,6 +32,7 @@ export default defineConfig({
           exclude: [
             'src/**/infrastructure/*.{spec,test}.ts',
             'src/**/application/*.{spec,test}.ts',
+            'src/api/**/*{spec,test}.ts'
           ],
         }
       }
