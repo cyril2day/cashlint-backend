@@ -1,0 +1,16 @@
+services:
+  db:
+    image: mariadb:11.8
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 1122
+      MYSQL_DATABASE: cashlint
+      MYSQL_USER: cashlint_user
+      MYSQL_PASSWORD: cashlint_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+volumes:
+  db_data:

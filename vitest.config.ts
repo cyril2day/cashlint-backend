@@ -10,6 +10,32 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['src/tests/**/*.{test,spec}.ts'],
-  },
+    pool: 'threads',
+    maxWorkers: 1,
+    projects: [
+      {
+        extends: true,
+        test:{
+          name: 'integration',
+          include: [
+            'src/**/infrastructure/*.{spec,test}.ts',
+            'src/**/application/*.{spec,test}.ts',
+            'src/api/**/*{spec,test}.ts'
+          ],
+        }
+      },
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['src/**/*.{spec,test}.ts'],
+          exclude: [
+            'src/**/infrastructure/*.{spec,test}.ts',
+            'src/**/application/*.{spec,test}.ts',
+            'src/api/**/*{spec,test}.ts'
+          ],
+        }
+      }
+    ]
+  }
 })

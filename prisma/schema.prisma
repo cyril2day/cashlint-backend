@@ -1,0 +1,84 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum AccountType {
+  Asset
+  Liability
+  Equity
+  Revenue
+  Expense
+}
+
+enum NormalBalance {
+  Debit
+  Credit
+}
+
+enum JournalLineSide {
+  Debit
+  Credit
+}
+
+model User {
+  id        String    @id @default(uuid())
+  username  String    @unique
+  createdAt DateTime  @default(now())
+  sessions  Session[]
+  accounts  Account[]
+  journalEntries JournalEntry[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Account {
+  id           String        @id @default(uuid())
+  userId       String
+  code         String        // account number, e.g., "101"
+  name         String
+  type         AccountType
+  normalBalance NormalBalance
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id])
+  journalLines JournalLine[]
+}
+
+model JournalEntry {
+  id          String        @id @default(uuid())
+  userId      String
+  entryNumber String?       // optional, could be auto-generated
+  description String
+  date        DateTime
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  user        User          @relation(fields: [userId], references: [id])
+  lines       JournalLine[]
+}
+
+model JournalLine {
+  id              String         @id @default(uuid())
+  journalEntryId  String
+  accountId       String
+  amount          Decimal        // positive amount, absolute value
+  side            JournalLineSide
+  createdAt       DateTime       @default(now())
+  journalEntry    JournalEntry   @relation(fields: [journalEntryId], references: [id])
+  account         Account        @relation(fields: [accountId], references: [id])
+}
