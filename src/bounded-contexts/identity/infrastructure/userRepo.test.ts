@@ -11,7 +11,11 @@ describe('Identity Context: User Repository (Infrastructure)', () => {
   
   // Clean up the database before every test to ensure isolation
   beforeEach(async () => {
-    await prisma.session.deleteMany() // Delete children first (FK constraint)
+    // Delete in order of foreign key dependencies (including ledger tables)
+    await prisma.journalLine.deleteMany()
+    await prisma.journalEntry.deleteMany()
+    await prisma.account.deleteMany()
+    await prisma.session.deleteMany()
     await prisma.user.deleteMany()
   })
 
@@ -29,7 +33,6 @@ describe('Identity Context: User Repository (Infrastructure)', () => {
     expect(result.isSuccess).toBe(true)
 
     if (result.isSuccess) {
-      console.log(result)
       expect(result.value.username).toBe(username)
       expect(result.value.id).toBeDefined()
     }
