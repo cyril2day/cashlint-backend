@@ -6,8 +6,8 @@
   "scripts": {
     "test:unit": "vitest --watch --project unit",
     "test:integration": "vitest run --project integration",
-    "dev": "tsx src/api/server.ts",
-    "build": "tsc"
+    "test:all": "vitest run --project unit && pnpm test:integration",
+    "dev": "tsx src/api/server.ts"
   },
   "keywords": [],
   "author": "",
@@ -29,7 +29,6 @@
     "@types/supertest": "^6.0.3",
     "prisma": "^7.0.1",
     "supertest": "^7.1.4",
-    "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.21.0",
     "vitest": "^4.0.14"
