@@ -1114,6 +1114,51 @@ paths:
           description: Customer not found
         '500':
           $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: List sales invoices
+      description: Retrieve sales invoices for the authenticated user, ordered by date descending.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID (must match authenticated user)
+        - name: skip
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          description: Pagination offset (default 0)
+        - name: take
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Pagination limit (default 20, max 100)
+      responses:
+        '200':
+          description: List of invoices retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invoices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SalesInvoice'
+                  count:
+                    type: integer
+                    description: Total number of invoices returned
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/schemas/ErrorResponse'
 
   /api/sales/invoices/{invoiceId}/payments:
     post:
