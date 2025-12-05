@@ -31,6 +31,21 @@ enum JournalLineSide {
   Credit
 }
 
+enum InvoiceStatus {
+  Draft
+  Issued
+  PartiallyPaid
+  Paid
+  Overdue
+}
+
+enum PaymentMethod {
+  Cash
+  Check
+  CreditCard
+  BankTransfer
+}
+
 model User {
   id        String    @id @default(uuid())
   username  String    @unique
@@ -38,6 +53,10 @@ model User {
   sessions  Session[]
   accounts  Account[]
   journalEntries JournalEntry[]
+  customers Customer[]
+  salesInvoices SalesInvoice[]
+  cashSales CashSale[]
+  customerDeposits CustomerDeposit[]
 }
 
 model Session {
@@ -70,6 +89,10 @@ model JournalEntry {
   updatedAt   DateTime      @updatedAt
   user        User          @relation(fields: [userId], references: [id])
   lines       JournalLine[]
+  salesInvoice SalesInvoice? // reverse relation
+  payment      Payment?      // reverse relation
+  cashSale     CashSale?     // reverse relation
+  customerDeposit CustomerDeposit? // reverse relation
 }
 
 model JournalLine {
@@ -81,4 +104,80 @@ model JournalLine {
   createdAt       DateTime       @default(now())
   journalEntry    JournalEntry   @relation(fields: [journalEntryId], references: [id])
   account         Account        @relation(fields: [accountId], references: [id])
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  email     String?
+  balance   Decimal  @default(0)   // subsidiary balance (Accounts Receivable)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+  invoices  SalesInvoice[]
+  cashSales CashSale[]
+  deposits  CustomerDeposit[]
+}
+
+model SalesInvoice {
+  id             String         @id @default(uuid())
+  userId         String
+  customerId     String
+  invoiceNumber  String
+  total          Decimal
+  status         InvoiceStatus  @default(Draft)
+  date           DateTime
+  dueDate        DateTime?
+  description    String?
+  journalEntryId String         @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id])
+  customer       Customer       @relation(fields: [customerId], references: [id])
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  payments       Payment[]
+}
+
+model Payment {
+  id             String         @id @default(uuid())
+  invoiceId      String
+  amount         Decimal
+  date           DateTime
+  method         PaymentMethod
+  reference      String?
+  journalEntryId String         @unique
+  createdAt      DateTime       @default(now())
+  invoice        SalesInvoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+}
+
+model CashSale {
+  id             String         @id @default(uuid())
+  userId         String
+  customerId     String
+  amount         Decimal
+  date           DateTime
+  description    String?
+  journalEntryId String         @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id])
+  customer       Customer       @relation(fields: [customerId], references: [id])
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+}
+
+model CustomerDeposit {
+  id             String         @id @default(uuid())
+  userId         String
+  customerId     String
+  amount         Decimal
+  date           DateTime
+  description    String?
+  journalEntryId String         @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id])
+  customer       Customer       @relation(fields: [customerId], references: [id])
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
 }
