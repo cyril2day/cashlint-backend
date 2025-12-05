@@ -1,6 +1,7 @@
 import express from 'express'
 import { identityRoutes } from './routes/identity'
 import { ledgerRoutes } from './routes/ledger'
+import { salesRoutes } from './routes/sales'
 
 const app = express()
 app.use(express.json())
@@ -8,6 +9,7 @@ app.use(express.json())
 // Register context-specific routes
 app.use('/api', identityRoutes)
 app.use('/api/ledger', ledgerRoutes)
+app.use('/api/sales', salesRoutes)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' })
