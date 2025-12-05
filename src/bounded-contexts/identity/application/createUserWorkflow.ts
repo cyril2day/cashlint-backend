@@ -1,7 +1,6 @@
 import { validateUsername } from '@/bounded-contexts/identity/domain/user'
 import { createUser } from '@/bounded-contexts/identity/infrastructure/userRepo'
 import { andThenAsync } from '@/common/types/result'
-import { User } from '@/prisma/client'
 
 /**
  * Create User Workflow - Application Layer
