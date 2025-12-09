@@ -11,8 +11,14 @@ describe('Identity Context: User Repository (Infrastructure)', () => {
   
   // Clean up the database before every test to ensure isolation
   beforeEach(async () => {
-    // Delete in order of foreign key dependencies (including ledger tables)
+    // Delete in order of foreign key dependencies (reverse topological order)
+    // Leaf tables first
     await prisma.journalLine.deleteMany()
+    await prisma.payment.deleteMany()
+    await prisma.salesInvoice.deleteMany()
+    await prisma.cashSale.deleteMany()
+    await prisma.customerDeposit.deleteMany()
+    await prisma.customer.deleteMany()
     await prisma.journalEntry.deleteMany()
     await prisma.account.deleteMany()
     await prisma.session.deleteMany()

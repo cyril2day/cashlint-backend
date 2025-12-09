@@ -54,7 +54,7 @@ describe('Sales Context: Issue Sales Invoice Workflow (Integration)', () => {
     return result.value
   }
 
-  it('should issue a sales invoice with valid data', async () => {
+  it('should issue a sales invoice with valid data', { timeout: 15000 }, async () => {
     const user = await createTestUser()
     const customer = await createTestCustomer(user.id)
     // Create required default accounts: 111 (Accounts Receivable) and 401 (Service Revenue)

@@ -470,7 +470,7 @@ describe('Sales Context: API Routes (Integration)', () => {
       expect(response.body.error.subtype).toBe('CustomerNotFound')
     })
 
-    it('should return 400 when required accounts are missing', async () => {
+    it('should return 404 when required accounts are missing', async () => {
       const userId = await createTestUser()
       const customerId = await createTestCustomer(userId)
       // Do not create accounts 111 and 401
@@ -486,7 +486,7 @@ describe('Sales Context: API Routes (Integration)', () => {
       const response = await request(app)
         .post('/api/sales/invoices')
         .send(invoiceData)
-        .expect(400)
+        .expect(404)
 
       expect(response.body.error.type).toBe('DomainFailure')
       expect(response.body.error.subtype).toBe('AccountNotFound')
@@ -698,17 +698,18 @@ describe('Sales Context: API Routes (Integration)', () => {
   })
 
   describe('POST /api/sales/invoices/:invoiceId/payments', () => {
-    it('should return 501 Not Implemented', async () => {
+    it('should return 400 when missing required fields (date, method)', async () => {
       const userId = await createTestUser()
       const invoiceId = 'some-id'
 
       const response = await request(app)
         .post(`/api/sales/invoices/${invoiceId}/payments`)
         .send({ userId, amount: 100 })
-        .expect(501)
+        .expect(400)
 
       expect(response.body.error.type).toBe('ApplicationFailure')
-      expect(response.body.error.subtype).toBe('NotImplemented')
+      expect(response.body.error.subtype).toBe('MissingField')
+      expect(response.body.error.message).toMatch(/date is required|method is required/)
     })
   })
 

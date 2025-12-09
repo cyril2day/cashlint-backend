@@ -3,10 +3,12 @@ import { createSalesInvoice, findSalesInvoiceByNumber } from '../infrastructure/
 import { findCustomerById, updateCustomerBalance } from '../infrastructure/customerRepo'
 import { createJournalEntry } from '@/bounded-contexts/ledger/infrastructure/journalEntryRepo'
 import { findAccountByCode } from '@/bounded-contexts/ledger/infrastructure/accountRepo'
-import { Result, Failure } from '@/common/types/result'
-import { DomainFailure } from '@/common/types/errors'
+import { Result, Failure, Success, andThen, fromNullable, map, fold } from '@/common/types/result'
+import { DomainFailure, AppError } from '@/common/types/errors'
 import { SalesDomainSubtype } from '../domain/errors'
-import { JournalLineSide } from '@/bounded-contexts/ledger/domain/ledger'
+import { JournalLineSide, Account } from '@/bounded-contexts/ledger/domain/ledger'
+import { DEFAULT_ACCOUNT_CODES } from '@/bounded-contexts/ledger/domain/defaultAccounts'
+import { fromNullable as optionFromNullable, getOrElse as optionGetOrElse } from '@/common/types/option'
 
 /**
  * Workflow input: raw data from command (API request).
@@ -52,18 +54,23 @@ export const issueSalesInvoiceWorkflow = async (command: IssueSalesInvoiceComman
     return validationResult
   }
 
+  // Helper to convert Result<T | null> to Result<T> with a custom error when null
+  const ensureNotNull = <T>(error: AppError) => (result: Result<T | null>): Result<T> => {
+    if (!result.isSuccess) return result
+    if (result.value === null) return Failure(error)
+    return Success(result.value)
+  }
+
   // Step 2: Validate customer exists
   const customerResult = await findCustomerById(command.userId, command.customerId)
-  if (!customerResult.isSuccess) {
-    return customerResult
-  }
-  if (customerResult.value === null) {
-    return Failure(
-      DomainFailure(
-        'CustomerNotFound' as SalesDomainSubtype,
-        `Customer ${command.customerId} not found or access denied.`
-      )
+  const customer = ensureNotNull(
+    DomainFailure(
+      'CustomerNotFound' as SalesDomainSubtype,
+      `Customer ${command.customerId} not found or access denied.`
     )
+  )(customerResult)
+  if (!customer.isSuccess) {
+    return customer
   }
 
   // Step 3: Validate invoice number uniqueness
@@ -79,52 +86,55 @@ export const issueSalesInvoiceWorkflow = async (command: IssueSalesInvoiceComman
       )
     )
   }
+  // At this point, existingInvoiceResult.isSuccess and value is null -> proceed
 
   // Step 4: Find required accounts
   // We assume the default chart of accounts: 111 for Accounts Receivable, 401 for Service Revenue
   // In a real application, these could be configurable per user, but for v1 we use defaults.
-  const arAccountResult = await findAccountByCode(command.userId, '111')
-  if (!arAccountResult.isSuccess) {
-    return arAccountResult
-  }
-  const arAccount = arAccountResult.value
-  if (arAccount === null) {
-    return Failure(
-      DomainFailure(
-        'AccountNotFound' as SalesDomainSubtype,
-        'Default Accounts Receivable account (code 111) not found. Please set up chart of accounts.'
-      )
+  const arAccountResult = await findAccountByCode(command.userId, DEFAULT_ACCOUNT_CODES.ACCOUNTS_RECEIVABLE)
+  const arAccount = ensureNotNull(
+    DomainFailure(
+      'AccountNotFound' as SalesDomainSubtype,
+      `Default Accounts Receivable account (code ${DEFAULT_ACCOUNT_CODES.ACCOUNTS_RECEIVABLE}) not found. Please set up chart of accounts.`
     )
+  )(arAccountResult)
+  if (!arAccount.isSuccess) {
+    return arAccount
   }
 
-  const revenueAccountResult = await findAccountByCode(command.userId, '401')
-  if (!revenueAccountResult.isSuccess) {
-    return revenueAccountResult
-  }
-  const revenueAccount = revenueAccountResult.value
-  if (revenueAccount === null) {
-    return Failure(
-      DomainFailure(
-        'AccountNotFound' as SalesDomainSubtype,
-        'Default Revenue account (code 401) not found. Please set up chart of accounts.'
-      )
+  const revenueAccountResult = await findAccountByCode(command.userId, DEFAULT_ACCOUNT_CODES.SERVICE_REVENUE)
+  const revenueAccount = ensureNotNull(
+    DomainFailure(
+      'AccountNotFound' as SalesDomainSubtype,
+      `Default Revenue account (code ${DEFAULT_ACCOUNT_CODES.SERVICE_REVENUE}) not found. Please set up chart of accounts.`
     )
+  )(revenueAccountResult)
+  if (!revenueAccount.isSuccess) {
+    return revenueAccount
   }
 
   // Step 5: Create journal entry
+  // Extract account values safely (they are guaranteed non-null by ensureNotNull)
+  // TypeScript needs explicit typing, so we assert after success checks
+  if (!arAccount.isSuccess) return arAccount
+  if (!revenueAccount.isSuccess) return revenueAccount
+  const arAccountValue = arAccount.value as Account
+  const revenueAccountValue = revenueAccount.value as Account
+
+  const description = optionGetOrElse(`Sales invoice ${command.invoiceNumber}`)(optionFromNullable(command.description))
   const journalEntryResult = await createJournalEntry({
     userId: command.userId,
     entryNumber: `INV-${command.invoiceNumber}`,
-    description: command.description || `Sales invoice ${command.invoiceNumber}`,
+    description,
     date: new Date(command.date),
     lines: [
       {
-        accountId: arAccount.id!,
+        accountId: arAccountValue.id!,
         amount: command.total,
         side: 'Debit' as JournalLineSide,
       },
       {
-        accountId: revenueAccount.id!,
+        accountId: revenueAccountValue.id!,
         amount: command.total,
         side: 'Credit' as JournalLineSide,
       },

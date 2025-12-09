@@ -32,7 +32,7 @@ describe('Sales Domain Validation Functions', () => {
       expect(result.isSuccess).toBe(false)
       if (!result.isSuccess) {
         expect(result.error.type).toBe('DomainFailure')
-        expect(result.error.message).toMatch(/Customer name must be between 1 and 200 characters/)
+        expect(result.error.message).toBe('Must be between 1 and 200 characters')
       }
     })
 
@@ -148,7 +148,7 @@ describe('Sales Domain Validation Functions', () => {
       const result = validateDateNotFuture(futureDate)
       expect(result.isSuccess).toBe(false)
       if (!result.isSuccess) {
-        expect(result.error.message).toMatch(/Invoice date cannot be in the future/)
+        expect(result.error.message).toBe('Date cannot be in the future')
       }
     })
 
@@ -217,12 +217,12 @@ describe('Sales Domain Validation Functions', () => {
     })
 
     it('should reject unknown payment method', () => {
-      const result = validatePaymentMethod('Bitcoin')
+      const result = validatePaymentMethod('Bitcoin' as any)
       expect(result.isSuccess).toBe(false)
     })
 
     it('should be case-sensitive (must match exactly)', () => {
-      const result = validatePaymentMethod('cash') // lowercase
+      const result = validatePaymentMethod('cash' as any) // lowercase
       expect(result.isSuccess).toBe(false)
     })
   })

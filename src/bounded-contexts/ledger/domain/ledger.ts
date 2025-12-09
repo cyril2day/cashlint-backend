@@ -2,6 +2,14 @@ import * as R from 'ramda'
 import { Result, Success, Failure, andThen } from '@/common/types/result'
 import { DomainFailure } from '@/common/types/errors'
 import { LedgerDomainSubtype } from './errors'
+import {
+  validateStringLength,
+  validatePositiveMoneyWith,
+  validateDateValid,
+  validateDateNotFuture as validateDateNotFutureShared,
+  validatePattern,
+  pipeValidators
+} from '@/shared/validation'
 
 // --- Value Objects ---
 
@@ -64,26 +72,21 @@ export type JournalEntry = {
   updatedAt?: Date
 }
 
-// --- Pure Validation Functions ---
-
-const isAccountCodeValid = (code: string): boolean =>
-  /^[0-9]+(\.[0-9]+)?$/.test(code) && code.length <= 20
-
-const isAccountNameValid = (name: string): boolean =>
-  name.trim().length >= 1 && name.length <= 100
-
-const isAmountValid = (amount: Money): boolean =>
-  amount > 0 && Number.isFinite(amount) && Math.round(amount * 100) === amount * 100
-
-const isDescriptionValid = (description: string): boolean =>
-  description.trim().length >= 1 && description.length <= 500
+// --- Shared Predicates (reused) ---
 
 /**
- * Validate and normalize an account code.
+ * Validate account code pattern (numeric with optional dot) and length.
  */
-export const validateAccountCode = (code: string): Result<AccountCode> => {
+export const validateAccountCode = (code: string): Result<string> => {
   const trimmed = code.trim()
-  if (!isAccountCodeValid(trimmed)) {
+  const patternResult = validatePattern(
+    /^[0-9]+(\.[0-9]+)?$/,
+    'InvalidAccountCode' as LedgerDomainSubtype,
+    'Account code must be numeric with optional dot, max 20 chars.'
+  )(trimmed)
+  if (!patternResult.isSuccess) return patternResult
+
+  if (trimmed.length > 20) {
     return Failure(
       DomainFailure(
         'InvalidAccountCode' as LedgerDomainSubtype,
@@ -95,35 +98,19 @@ export const validateAccountCode = (code: string): Result<AccountCode> => {
 }
 
 /**
- * Validate account name.
+ * Validate account name length.
  */
-export const validateAccountName = (name: string): Result<string> => {
-  const trimmed = name.trim()
-  if (!isAccountNameValid(trimmed)) {
-    return Failure(
-      DomainFailure(
-        'InvalidAccountName' as LedgerDomainSubtype,
-        'Account name must be between 1 and 100 characters.'
-      )
-    )
-  }
-  return Success(trimmed)
-}
+export const validateAccountName = validateStringLength(1, 100, 'InvalidAccountName' as LedgerDomainSubtype)
 
 /**
  * Validate amount (positive, up to two decimals).
  */
-export const validateAmount = (amount: Money): Result<Money> => {
-  if (!isAmountValid(amount)) {
-    return Failure(
-      DomainFailure(
-        'InvalidAmount' as LedgerDomainSubtype,
-        'Amount must be positive and have at most two decimal places.'
-      )
-    )
-  }
-  return Success(amount)
-}
+export const validateAmount = validatePositiveMoneyWith('InvalidAmount' as LedgerDomainSubtype)
+
+/**
+ * Validate description length.
+ */
+export const validateDescription = validateStringLength(1, 500, 'InvalidJournalEntryDescription' as LedgerDomainSubtype)
 
 /**
  * Validate that the journal entry is balanced (total debits = total credits).
@@ -168,28 +155,30 @@ export const validateJournalEntryHasLines = (lines: JournalLine[]): Result<Journ
 }
 
 /**
+ * Validate date is valid and not in the future (optional business rule).
+ */
+export const validateJournalEntryDate = (date: Date): Result<Date> => {
+  const validResult = validateDateValid(date)
+  if (!validResult.isSuccess) {
+    // Map generic error to ledger-specific error
+    return Failure(DomainFailure('InvalidJournalEntryDate' as LedgerDomainSubtype, validResult.error.message))
+  }
+  // Optionally, we could also check that date is not in the future.
+  // For now, we'll keep the same behavior as before (only validate it's a valid date).
+  return Success(date)
+}
+
+/**
  * Validate the entire journal entry (composition of validations).
  */
 export const validateJournalEntry = (entry: Omit<JournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Result<JournalEntry> => {
   // Validate description
-  if (!isDescriptionValid(entry.description)) {
-    return Failure(
-      DomainFailure(
-        'InvalidJournalEntryDescription' as LedgerDomainSubtype,
-        'Description must be between 1 and 500 characters.'
-      )
-    )
-  }
+  const descriptionResult = validateDescription(entry.description)
+  if (!descriptionResult.isSuccess) return descriptionResult as Result<JournalEntry>
 
-  // Validate date (must be a valid Date, not in the future? we'll leave that for business rules)
-  if (!(entry.date instanceof Date) || isNaN(entry.date.getTime())) {
-    return Failure(
-      DomainFailure(
-        'InvalidJournalEntryDate' as LedgerDomainSubtype,
-        'Date must be a valid date.'
-      )
-    )
-  }
+  // Validate date
+  const dateResult = validateJournalEntryDate(entry.date)
+  if (!dateResult.isSuccess) return dateResult as Result<JournalEntry>
 
   // Validate lines using railway composition
   const linesResult = validateJournalEntryHasLines(entry.lines)
@@ -204,9 +193,6 @@ export const validateJournalEntry = (entry: Omit<JournalEntry, 'id' | 'userId' |
       updatedAt: undefined,
     })
   } else {
-    // balancedResult is a Failure, but its error type is AppError, which matches Result<JournalEntry>
-    // However, TypeScript doesn't know that balancedResult.error is the same as the error we need.
-    // We can return Failure(balancedResult.error) to satisfy the type.
     return Failure(balancedResult.error)
   }
 }

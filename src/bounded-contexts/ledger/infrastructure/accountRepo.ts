@@ -4,6 +4,7 @@ import { InfrastructureFailure } from '@/common/types/errors'
 import { Prisma } from '@/prisma/client'
 import { Account, AccountType, NormalBalance } from '../domain/ledger'
 import { LedgerInfrastructureSubtype } from '../domain/errors'
+import { fromNullable, getOrElse } from '@/common/types/option'
 
 const safeDbCall = async <T>(promise: Promise<T>): Promise<Result<T>> => {
   try {
@@ -29,10 +30,11 @@ const safeDbCall = async <T>(promise: Promise<T>): Promise<Result<T>> => {
       )
     }
     // unknown error
+    const errorMessage = getOrElse('Unknown database error')(fromNullable(e?.message))
     return Failure(
       InfrastructureFailure(
         'AccountRepositoryError' as LedgerInfrastructureSubtype,
-        e.message || 'Unknown database error',
+        errorMessage,
         e
       )
     )
@@ -64,8 +66,8 @@ export const createAccount = (account: Omit<Account, 'id' | 'createdAt' | 'updat
       normalBalance: account.normalBalance,
     },
   })
-  return safeDbCall(action).then(result => 
-    result.isSuccess 
+  return safeDbCall(action).then(result =>
+    result.isSuccess
       ? Success(toDomainAccount(result.value))
       : result
   )

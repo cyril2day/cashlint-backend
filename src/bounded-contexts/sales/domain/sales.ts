@@ -1,6 +1,15 @@
+import * as R from 'ramda'
 import { Result, Success, Failure, andThen } from '@/common/types/result'
 import { DomainFailure } from '@/common/types/errors'
 import { SalesDomainSubtype } from './errors'
+import {
+  validateStringLength,
+  validatePositiveMoneyWith,
+  validateDateNotFuture as validateDateNotFutureShared,
+  validateEmailOptional,
+  validateOneOf,
+  pipeValidators
+} from '@/shared/validation'
 
 // --- Value Objects ---
 
@@ -95,119 +104,67 @@ export type CustomerDeposit = {
   readonly updatedAt?: Date
 }
 
-// --- Pure Validation Functions ---
-
-const isCustomerNameValid = (name: string): boolean =>
-  name.trim().length >= 1 && name.length <= 200
-
-const isEmailValid = (email: string | undefined): boolean =>
-  email === undefined || email === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-
-const isInvoiceNumberValid = (invoiceNumber: string): boolean =>
-  invoiceNumber.trim().length >= 1 && invoiceNumber.length <= 50
-
-const isAmountValid = (amount: Money): boolean =>
-  amount > 0 && Number.isFinite(amount) && Math.round(amount * 100) === amount * 100
-
-const isDateValid = (date: Date): boolean =>
-  date instanceof Date && !isNaN(date.getTime())
-
-const isDateNotFuture = (date: Date): boolean =>
-  date <= new Date()
-
-const isDueDateAfterInvoiceDate = (invoiceDate: Date, dueDate?: Date): boolean =>
-  dueDate === undefined || dueDate >= invoiceDate
-
-const isPaymentMethodValid = (method: string): method is PaymentMethod =>
-  ['Cash', 'Check', 'CreditCard', 'BankTransfer'].includes(method)
+// --- Pure Validation Functions (using shared validators) ---
 
 /**
  * Validate customer name.
  */
-export const validateCustomerName = (name: string): Result<CustomerName> => {
-  const trimmed = name.trim()
-  if (!isCustomerNameValid(trimmed)) {
-    return Failure(
-      DomainFailure(
-        'InvalidCustomerName' as SalesDomainSubtype,
-        'Customer name must be between 1 and 200 characters.'
-      )
-    )
-  }
-  return Success(trimmed)
-}
+export const validateCustomerName = validateStringLength(1, 200, 'InvalidCustomerName' as SalesDomainSubtype)
 
 /**
  * Validate customer email.
  */
 export const validateCustomerEmail = (email: string | undefined): Result<string | undefined> => {
-  if (email === undefined || email === '') {
-    return Success(undefined)
+  const result = validateEmailOptional(email)
+  if (!result.isSuccess) {
+    // Map generic 'InvalidEmail' to sales-specific subtype
+    return Failure(DomainFailure('InvalidCustomerEmail' as SalesDomainSubtype, result.error.message))
   }
-  const trimmed = email.trim()
-  if (!isEmailValid(trimmed)) {
-    return Failure(
-      DomainFailure(
-        'InvalidCustomerEmail' as SalesDomainSubtype,
-        'Email must be a valid email address.'
-      )
-    )
-  }
-  return Success(trimmed)
+  return result
 }
 
 /**
  * Validate invoice number.
  */
-export const validateInvoiceNumber = (invoiceNumber: string): Result<InvoiceNumber> => {
-  const trimmed = invoiceNumber.trim()
-  if (!isInvoiceNumberValid(trimmed)) {
-    return Failure(
-      DomainFailure(
-        'InvalidInvoiceNumber' as SalesDomainSubtype,
-        'Invoice number must be between 1 and 50 characters.'
-      )
-    )
-  }
-  return Success(trimmed)
-}
+export const validateInvoiceNumber = validateStringLength(1, 50, 'InvalidInvoiceNumber' as SalesDomainSubtype)
 
 /**
  * Validate amount (positive, up to two decimals).
  */
-export const validateAmount = (amount: Money): Result<Money> => {
-  if (!isAmountValid(amount)) {
-    return Failure(
-      DomainFailure(
-        'InvalidInvoiceTotal' as SalesDomainSubtype,
-        'Amount must be positive and have at most two decimal places.'
-      )
-    )
-  }
-  return Success(amount)
-}
+export const validateAmount = validatePositiveMoneyWith('InvalidInvoiceTotal' as SalesDomainSubtype)
+
+/**
+ * Validate payment amount (positive, up to two decimals).
+ */
+export const validatePaymentAmount = validatePositiveMoneyWith('InvalidPaymentAmount' as SalesDomainSubtype)
 
 /**
  * Validate date (not future).
  */
 export const validateDateNotFuture = (date: Date): Result<Date> => {
-  if (!isDateValid(date)) {
-    return Failure(
-      DomainFailure(
-        'InvalidInvoiceDate' as SalesDomainSubtype,
-        'Date must be a valid date.'
-      )
-    )
+  const result = validateDateNotFutureShared(date)
+  if (!result.isSuccess) {
+    // Map generic error to sales-specific error
+    const subtype = result.error.subtype === 'DateInFuture' 
+      ? 'InvoiceDateInFuture' as SalesDomainSubtype
+      : 'InvalidInvoiceDate' as SalesDomainSubtype
+    return Failure(DomainFailure(subtype, result.error.message))
   }
-  if (!isDateNotFuture(date)) {
-    return Failure(
-      DomainFailure(
-        'InvoiceDateInFuture' as SalesDomainSubtype,
-        'Invoice date cannot be in the future.'
-      )
-    )
+  return result
+}
+
+/**
+ * Validate payment date (not future).
+ */
+export const validatePaymentDateNotFuture = (date: Date): Result<Date> => {
+  const result = validateDateNotFutureShared(date)
+  if (!result.isSuccess) {
+    const subtype = result.error.subtype === 'DateInFuture'
+      ? 'PaymentDateInFuture' as SalesDomainSubtype
+      : 'InvalidPaymentDate' as SalesDomainSubtype
+    return Failure(DomainFailure(subtype, result.error.message))
   }
-  return Success(date)
+  return result
 }
 
 /**
@@ -217,38 +174,32 @@ export const validateDueDate = (invoiceDate: Date, dueDate?: Date): Result<Date 
   if (dueDate === undefined) {
     return Success(undefined)
   }
-  if (!isDateValid(dueDate)) {
-    return Failure(
-      DomainFailure(
-        'InvalidDueDate' as SalesDomainSubtype,
-        'Due date must be a valid date.'
-      )
-    )
-  }
-  if (!isDueDateAfterInvoiceDate(invoiceDate, dueDate)) {
-    return Failure(
-      DomainFailure(
-        'InvalidDueDate' as SalesDomainSubtype,
-        'Due date must be on or after invoice date.'
-      )
-    )
-  }
-  return Success(dueDate)
+  
+  // Use pipeValidators to chain validations
+  const validator = pipeValidators<Date>(
+    (d) => validateDateNotFutureShared(d),
+    (d) => d >= invoiceDate 
+      ? Success(d)
+      : Failure(DomainFailure('InvalidDueDate' as SalesDomainSubtype, 'Due date must be on or after invoice date.'))
+  )
+  
+  return validator(dueDate)
 }
 
 /**
  * Validate payment method.
  */
 export const validatePaymentMethod = (method: string): Result<PaymentMethod> => {
-  if (!isPaymentMethodValid(method)) {
-    return Failure(
-      DomainFailure(
-        'InvalidPaymentMethod' as SalesDomainSubtype,
-        'Payment method must be one of: Cash, Check, CreditCard, BankTransfer.'
-      )
-    )
+  const allowed: PaymentMethod[] = ['Cash', 'Check', 'CreditCard', 'BankTransfer']
+  if (allowed.includes(method as PaymentMethod)) {
+    return Success(method as PaymentMethod)
   }
-  return Success(method)
+  return Failure(
+    DomainFailure(
+      'InvalidPaymentMethod' as SalesDomainSubtype,
+      'Payment method must be one of: Cash, Check, CreditCard, BankTransfer.'
+    )
+  )
 }
 
 /**
