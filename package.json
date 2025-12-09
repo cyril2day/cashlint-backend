@@ -7,7 +7,9 @@
     "test:unit": "vitest --watch --project unit",
     "test:integration": "vitest run --project integration",
     "test:all": "vitest run --project unit && pnpm test:integration",
-    "dev": "tsx src/api/server.ts"
+    "dev": "tsx src/api/server.ts",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:generate": "prisma generate"
   },
   "keywords": [],
   "author": "",
