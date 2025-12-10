@@ -12,12 +12,17 @@ describe('Ledger Context: Post Journal Entry Workflow (Integration)', () => {
   // Clean up the database before every test to ensure isolation
   beforeEach(async () => {
     await prisma.payment.deleteMany()
+    await prisma.loanPayment.deleteMany()
+    await prisma.cashExpense.deleteMany()
+    await prisma.vendorBill.deleteMany()
     await prisma.salesInvoice.deleteMany()
     await prisma.cashSale.deleteMany()
     await prisma.customerDeposit.deleteMany()
-    await prisma.customer.deleteMany()
     await prisma.journalLine.deleteMany()
     await prisma.journalEntry.deleteMany()
+    await prisma.loan.deleteMany()
+    await prisma.vendor.deleteMany()
+    await prisma.customer.deleteMany()
     await prisma.account.deleteMany()
     await prisma.session.deleteMany()
     await prisma.user.deleteMany()
@@ -182,6 +187,31 @@ describe('Ledger Context: Post Journal Entry Workflow (Integration)', () => {
     }
   })
 
+  it('should reject journal entry with amount having more than two decimal places', async () => {
+    const user = await createTestUser()
+    const cashAccount = await createTestAccount(user.id, '101', 'Cash', 'Asset', 'Debit')
+    const revenueAccount = await createTestAccount(user.id, '401', 'Service Revenue', 'Revenue', 'Credit')
+
+    const command: PostJournalEntryCommand = {
+      userId: user.id,
+      description: 'Invalid amount precision',
+      date: '2025-01-15T00:00:00Z',
+      lines: [
+        { accountId: cashAccount.id, amount: 500.123, side: 'Debit' as const }, // Invalid precision
+        { accountId: revenueAccount.id, amount: 500.123, side: 'Credit' as const }
+      ]
+    }
+
+    const result = await postJournalEntryWorkflow(command)
+
+    expect(result.isSuccess).toBe(false)
+    if (!result.isSuccess) {
+      expect(result.error.type).toBe('DomainFailure')
+      expect(result.error.subtype).toBe('InvalidAmount')
+      expect(result.error.message).toMatch(/at most two decimal places/)
+    }
+  })
+
   it('should accept an entry with multiple debit and credit lines', async () => {
     const user = await createTestUser()
     const cashId = (await createTestAccount(user.id, '101', 'Cash', 'Asset', 'Debit')).id
@@ -210,6 +240,32 @@ describe('Ledger Context: Post Journal Entry Workflow (Integration)', () => {
       const credits = result.value.lines.filter(l => l.side === 'Credit').reduce((sum, l) => sum + l.amount, 0)
       expect(debits).toBe(500)
       expect(credits).toBe(500)
+    }
+  })
+
+  it('should reject journal entry with description exceeding max length of 500 characters', async () => {
+    const user = await createTestUser()
+    const cashAccount = await createTestAccount(user.id, '101', 'Cash', 'Asset', 'Debit')
+    const revenueAccount = await createTestAccount(user.id, '401', 'Service Revenue', 'Revenue', 'Credit')
+
+    const longDescription = 'a'.repeat(501) // 501 characters
+    const command: PostJournalEntryCommand = {
+      userId: user.id,
+      description: longDescription,
+      date: '2025-01-15T00:00:00Z',
+      lines: [
+        { accountId: cashAccount.id, amount: 100, side: 'Debit' as const },
+        { accountId: revenueAccount.id, amount: 100, side: 'Credit' as const }
+      ]
+    }
+
+    const result = await postJournalEntryWorkflow(command)
+
+    expect(result.isSuccess).toBe(false)
+    if (!result.isSuccess) {
+      expect(result.error.type).toBe('DomainFailure')
+      expect(result.error.subtype).toBe('InvalidJournalEntryDescription')
+      expect(result.error.message).toMatch(/between 1 and 500 characters/)
     }
   })
 })

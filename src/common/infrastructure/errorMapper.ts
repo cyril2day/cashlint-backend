@@ -16,12 +16,16 @@ export const mapErrorToResponse = (error: AppError): { status: number; body: any
         case 'InvoiceNotFound':
         case 'JournalEntryNotFound':
         case 'UserNotFound':
+        case 'VendorNotFound':
+        case 'BillNotFound':
+        case 'LoanNotFound':
           return {
             status: 404, // Not Found
             body: { error }
           }
         case 'DuplicateInvoiceNumber':
         case 'DuplicateAccountCode':
+        case 'DuplicateBillNumber':
           return {
             status: 409, // Conflict
             body: { error }

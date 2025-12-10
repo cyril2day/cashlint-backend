@@ -1,56 +1,59 @@
 import { describe, it, expect, beforeEach, afterAll, beforeAll } from 'vitest'
-import { createCustomerWorkflow } from '@/bounded-contexts/sales/application/createCustomerWorkflow'
+import { createVendorWorkflow, CreateVendorCommand } from './createVendorWorkflow'
 import { prisma } from '@/common/infrastructure/db'
-import type { CreateCustomerCommand } from '@/bounded-contexts/sales/application/createCustomerWorkflow'
 
-describe('Sales Context: Create Customer Workflow (Integration)', () => {
+describe('Purchasing Context: Create Vendor Workflow (Integration)', () => {
   beforeAll(async () => {
     await prisma.$connect()
   })
 
-  // Clean up the database before every test to ensure isolation
+  // Clean up before each test
   beforeEach(async () => {
-    // Delete child tables of JournalEntry and other parents
-    await prisma.loanPayment.deleteMany()
-    await prisma.cashExpense.deleteMany()
-    await prisma.vendorBill.deleteMany()
+    // Delete in correct order, respecting foreign keys
+    // 1. Child tables of JournalEntry (that are not already in purchasing)
     await prisma.payment.deleteMany()
+    await prisma.salesInvoice.deleteMany()
     await prisma.cashSale.deleteMany()
     await prisma.customerDeposit.deleteMany()
-    await prisma.salesInvoice.deleteMany()
-    // Delete parents of the above (except JournalEntry and Vendor and Loan)
+    // 2. Purchasing child tables of JournalEntry
+    await prisma.loanPayment.deleteMany()
+    await prisma.vendorBill.deleteMany()
+    await prisma.cashExpense.deleteMany()
+    // 3. Other child tables
     await prisma.loan.deleteMany()
     await prisma.vendor.deleteMany()
     await prisma.customer.deleteMany()
-    // Now delete JournalEntry and its lines
+    // 4. JournalLine (depends on JournalEntry and Account)
     await prisma.journalLine.deleteMany()
+    // 5. JournalEntry (depends on User)
     await prisma.journalEntry.deleteMany()
-    // Then delete Account, Session, User
+    // 6. Account (depends on User)
     await prisma.account.deleteMany()
+    // 7. Session (depends on User)
     await prisma.session.deleteMany()
+    // 8. User
     await prisma.user.deleteMany()
   })
 
-  // Disconnect after all tests are done
   afterAll(async () => {
     await prisma.$disconnect()
   })
 
-  const createTestUser = async (username: string = 'test_user_sales') => {
+  const createTestUser = async (username: string = 'test_user_purchasing') => {
     return await prisma.user.create({
       data: { username }
     })
   }
 
-  it('should create a customer with valid data', async () => {
+  it('should create a vendor with valid data', async () => {
     const user = await createTestUser()
-    const command: CreateCustomerCommand = {
+    const command: CreateVendorCommand = {
       userId: user.id,
       name: 'Acme Corporation',
       email: 'contact@acme.example'
     }
 
-    const result = await createCustomerWorkflow(command)
+    const result = await createVendorWorkflow(command)
 
     expect(result.isSuccess).toBe(true)
     if (result.isSuccess) {
@@ -63,70 +66,70 @@ describe('Sales Context: Create Customer Workflow (Integration)', () => {
     }
 
     // Verify in database
-    const dbCustomer = await prisma.customer.findUnique({
+    const dbVendor = await prisma.vendor.findUnique({
       where: { id: result.isSuccess ? result.value.id : '' }
     })
-    expect(dbCustomer).not.toBeNull()
-    expect(dbCustomer?.name).toBe('Acme Corporation')
+    expect(dbVendor).not.toBeNull()
+    expect(dbVendor?.name).toBe('Acme Corporation')
   })
 
-  it('should create a customer without email', async () => {
+  it('should create a vendor without email', async () => {
     const user = await createTestUser()
-    const command: CreateCustomerCommand = {
+    const command: CreateVendorCommand = {
       userId: user.id,
       name: 'John Doe',
     }
 
-    const result = await createCustomerWorkflow(command)
+    const result = await createVendorWorkflow(command)
     expect(result.isSuccess).toBe(true)
     if (result.isSuccess) {
       expect(result.value.email).toBeUndefined()
     }
   })
 
-  it('should reject invalid customer name (empty)', async () => {
+  it('should reject invalid vendor name (empty)', async () => {
     const user = await createTestUser()
-    const command: CreateCustomerCommand = {
+    const command: CreateVendorCommand = {
       userId: user.id,
       name: '', // invalid
     }
 
-    const result = await createCustomerWorkflow(command)
+    const result = await createVendorWorkflow(command)
     expect(result.isSuccess).toBe(false)
     if (!result.isSuccess) {
       expect(result.error.type).toBe('DomainFailure')
-      expect(result.error.subtype).toBe('InvalidCustomerName')
+      expect(result.error.subtype).toBe('InvalidVendorName')
     }
   })
 
   it('should reject invalid email format', async () => {
     const user = await createTestUser()
-    const command: CreateCustomerCommand = {
+    const command: CreateVendorCommand = {
       userId: user.id,
       name: 'Test',
       email: 'invalid-email'
     }
 
-    const result = await createCustomerWorkflow(command)
+    const result = await createVendorWorkflow(command)
     expect(result.isSuccess).toBe(false)
     if (!result.isSuccess) {
       expect(result.error.type).toBe('DomainFailure')
-      expect(result.error.subtype).toBe('InvalidCustomerEmail')
+      expect(result.error.subtype).toBe('InvalidVendorEmail')
     }
   })
 
-  // Note: we are not enforcing unique customer names per user in v1, so duplicates are allowed.
-  it('should allow duplicate customer names for same user', async () => {
+  // Note: we are not enforcing unique vendor names per user in v1, so duplicates are allowed.
+  it('should allow duplicate vendor names for same user', async () => {
     const user = await createTestUser()
-    const command: CreateCustomerCommand = {
+    const command: CreateVendorCommand = {
       userId: user.id,
       name: 'Duplicate Name',
     }
 
-    const firstResult = await createCustomerWorkflow(command)
+    const firstResult = await createVendorWorkflow(command)
     expect(firstResult.isSuccess).toBe(true)
 
-    const secondResult = await createCustomerWorkflow(command)
+    const secondResult = await createVendorWorkflow(command)
     expect(secondResult.isSuccess).toBe(true)
   })
 })

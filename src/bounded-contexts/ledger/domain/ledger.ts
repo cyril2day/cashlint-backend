@@ -155,16 +155,27 @@ export const validateJournalEntryHasLines = (lines: JournalLine[]): Result<Journ
 }
 
 /**
- * Validate date is valid and not in the future (optional business rule).
+ * Validate each line's amount is valid money.
+ */
+export const validateLinesAmount = (lines: JournalLine[]): Result<JournalLine[]> => {
+  for (const line of lines) {
+    const amountResult = validateAmount(line.amount)
+    if (!amountResult.isSuccess) {
+      return Failure(amountResult.error)
+    }
+  }
+  return Success(lines)
+}
+
+/**
+ * Validate date is valid and not in the future.
  */
 export const validateJournalEntryDate = (date: Date): Result<Date> => {
-  const validResult = validateDateValid(date)
+  const validResult = validateDateNotFutureShared(date)
   if (!validResult.isSuccess) {
     // Map generic error to ledger-specific error
     return Failure(DomainFailure('InvalidJournalEntryDate' as LedgerDomainSubtype, validResult.error.message))
   }
-  // Optionally, we could also check that date is not in the future.
-  // For now, we'll keep the same behavior as before (only validate it's a valid date).
   return Success(date)
 }
 
@@ -182,7 +193,8 @@ export const validateJournalEntry = (entry: Omit<JournalEntry, 'id' | 'userId' |
 
   // Validate lines using railway composition
   const linesResult = validateJournalEntryHasLines(entry.lines)
-  const balancedResult = andThen(validateJournalEntryBalanced)(linesResult)
+  const amountResult = andThen(validateLinesAmount)(linesResult)
+  const balancedResult = andThen(validateJournalEntryBalanced)(amountResult)
 
   if (balancedResult.isSuccess) {
     return Success({

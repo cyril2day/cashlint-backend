@@ -11,12 +11,17 @@ describe('Ledger Context: Create Account Workflow (Integration)', () => {
   // Clean up the database before every test to ensure isolation
   beforeEach(async () => {
     await prisma.payment.deleteMany()
+    await prisma.loanPayment.deleteMany()
+    await prisma.cashExpense.deleteMany()
+    await prisma.vendorBill.deleteMany()
     await prisma.salesInvoice.deleteMany()
     await prisma.cashSale.deleteMany()
     await prisma.customerDeposit.deleteMany()
-    await prisma.customer.deleteMany()
     await prisma.journalLine.deleteMany()
     await prisma.journalEntry.deleteMany()
+    await prisma.loan.deleteMany()
+    await prisma.vendor.deleteMany()
+    await prisma.customer.deleteMany()
     await prisma.account.deleteMany()
     await prisma.session.deleteMany()
     await prisma.user.deleteMany()
@@ -137,6 +142,26 @@ describe('Ledger Context: Create Account Workflow (Integration)', () => {
     }
   })
 
+  it('should reject account code exceeding max length of 20 characters', async () => {
+    const user = await createTestUser()
+    const longCode = '123456789012345678901' // 21 characters
+    const command: CreateAccountCommand = {
+      userId: user.id,
+      code: longCode,
+      name: 'Too Long Code',
+      type: 'Asset',
+      normalBalance: 'Debit'
+    }
+
+    const result = await createAccountWorkflow(command)
+    expect(result.isSuccess).toBe(false)
+    if (!result.isSuccess) {
+      expect(result.error.type).toBe('DomainFailure')
+      expect(result.error.subtype).toBe('InvalidAccountCode')
+      expect(result.error.message).toMatch(/max 20 chars/)
+    }
+  })
+
   it('should reject invalid account name (empty)', async () => {
     const user = await createTestUser()
     const command: CreateAccountCommand = {
@@ -152,6 +177,26 @@ describe('Ledger Context: Create Account Workflow (Integration)', () => {
     if (!result.isSuccess) {
       expect(result.error.type).toBe('DomainFailure')
       expect(result.error.subtype).toBe('InvalidAccountName')
+    }
+  })
+
+  it('should reject invalid account name (exceeds max length of 100 characters)', async () => {
+    const user = await createTestUser()
+    const longName = 'a'.repeat(101) // 101 characters
+    const command: CreateAccountCommand = {
+      userId: user.id,
+      code: '101',
+      name: longName,
+      type: 'Asset',
+      normalBalance: 'Debit'
+    }
+
+    const result = await createAccountWorkflow(command)
+    expect(result.isSuccess).toBe(false)
+    if (!result.isSuccess) {
+      expect(result.error.type).toBe('DomainFailure')
+      expect(result.error.subtype).toBe('InvalidAccountName')
+      expect(result.error.message).toMatch(/between 1 and 100 characters/)
     }
   })
 

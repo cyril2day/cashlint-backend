@@ -21,6 +21,8 @@ export type SalesDomainSubtype =
   | 'InvalidPaymentAmount'
   | 'PaymentDateInFuture'
   | 'InvalidPaymentDate'
+  | 'CashSaleDateInFuture'
+  | 'InvalidCashSaleDate'
 
 export type SalesInfrastructureSubtype =
   | 'CustomerRepositoryError'
