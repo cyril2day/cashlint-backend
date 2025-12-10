@@ -1,8 +1,10 @@
 import { Router } from 'express'
 import { createCustomerWorkflow, CreateCustomerCommand } from '@/bounded-contexts/sales/application/createCustomerWorkflow'
 import { issueSalesInvoiceWorkflow, IssueSalesInvoiceCommand } from '@/bounded-contexts/sales/application/issueSalesInvoiceWorkflow'
+import { applyPaymentToInvoiceWorkflow, ApplyPaymentToInvoiceCommand } from '@/bounded-contexts/sales/application/applyPaymentToInvoiceWorkflow'
 import { listCustomers, findCustomerById } from '@/bounded-contexts/sales/infrastructure/customerRepo'
 import { listSalesInvoices, findSalesInvoiceById } from '@/bounded-contexts/sales/infrastructure/salesInvoiceRepo'
+import { sendErrorResponse, wrapAsyncRoute } from '@/common/infrastructure/errorMapper'
 
 const router = Router()
 
@@ -23,68 +25,39 @@ const router = Router()
  * - 409: Duplicate customer name (if we decide to enforce uniqueness, but not in v1)
  * - 500: Internal server error
  */
-router.post('/customers', async (req, res) => {
+router.post('/customers', wrapAsyncRoute(async (req, res) => {
   const { userId, name, email } = req.body
 
   // Basic validation of required fields
   if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'userId is required and must be a string'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'userId is required and must be a string'
     })
+    return
   }
   if (!name || typeof name !== 'string') {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'name is required and must be a string'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'name is required and must be a string'
     })
+    return
   }
 
-  try {
-    const command: CreateCustomerCommand = { userId, name, email }
-    const result = await createCustomerWorkflow(command)
+  const command: CreateCustomerCommand = { userId, name, email }
+  const result = await createCustomerWorkflow(command)
 
-    if (result.isSuccess) {
-      return res.status(201).json({
-        customer: result.value,
-        message: 'Customer created successfully'
-      })
-    } else {
-      // Map domain/infrastructure errors to appropriate HTTP status codes
-      if (result.error.type === 'DomainFailure') {
-        // In the future, we might have a duplicate customer error
-        return res.status(400).json({
-          error: result.error
-        })
-      }
-
-      // Infrastructure errors (e.g., database connection) -> 500
-      return res.status(500).json({
-        error: {
-          type: 'ApplicationFailure',
-          subtype: 'InternalError',
-          message: 'An unexpected error occurred'
-        }
-      })
-    }
-  } catch (error) {
-    // Unexpected errors (should not happen with our Result pattern)
-    console.error('Unexpected error in customer creation:', error)
-    return res.status(500).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'InternalError',
-        message: 'An unexpected error occurred'
-      }
+  if (result.isSuccess) {
+    return res.status(201).json({
+      customer: result.value,
+      message: 'Customer created successfully'
     })
+  } else {
+    sendErrorResponse(res, result.error)
   }
-})
+}))
 
 /**
  * POST /api/sales/invoices
@@ -108,111 +81,63 @@ router.post('/customers', async (req, res) => {
  * - 409: Duplicate invoice number
  * - 500: Internal server error
  */
-router.post('/invoices', async (req, res) => {
+router.post('/invoices', wrapAsyncRoute(async (req, res) => {
   const { userId, customerId, invoiceNumber, total, date, dueDate, description } = req.body
 
   // Basic validation
   if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'userId is required and must be a string'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'userId is required and must be a string'
     })
+    return
   }
   if (!customerId || typeof customerId !== 'string') {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'customerId is required and must be a string'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'customerId is required and must be a string'
     })
+    return
   }
   if (!invoiceNumber || typeof invoiceNumber !== 'string') {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'invoiceNumber is required and must be a string'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'invoiceNumber is required and must be a string'
     })
+    return
   }
   if (typeof total !== 'number' || total <= 0) {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'total must be a positive number'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'total must be a positive number'
     })
+    return
   }
   if (!date || typeof date !== 'string') {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'date is required and must be an ISO string'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'date is required and must be an ISO string'
     })
+    return
   }
 
-  try {
-    const command: IssueSalesInvoiceCommand = { userId, customerId, invoiceNumber, total, date, dueDate, description }
-    const result = await issueSalesInvoiceWorkflow(command)
+  const command: IssueSalesInvoiceCommand = { userId, customerId, invoiceNumber, total, date, dueDate, description }
+  const result = await issueSalesInvoiceWorkflow(command)
 
-    if (result.isSuccess) {
-      return res.status(201).json({
-        invoice: result.value,
-        message: 'Invoice issued successfully'
-      })
-    } else {
-      // Map domain/infrastructure errors
-      if (result.error.type === 'DomainFailure') {
-        // CustomerNotFound is a domain failure in our workflow
-        if (result.error.subtype === 'CustomerNotFound') {
-          return res.status(404).json({
-            error: result.error
-          })
-        }
-        // DuplicateInvoiceNumber
-        if (result.error.subtype === 'DuplicateInvoiceNumber') {
-          return res.status(409).json({
-            error: result.error
-          })
-        }
-        // AccountNotFound (default chart of accounts missing)
-        if (result.error.subtype === 'AccountNotFound') {
-          return res.status(400).json({
-            error: result.error
-          })
-        }
-        return res.status(400).json({
-          error: result.error
-        })
-      }
-
-      // Infrastructure errors
-      return res.status(500).json({
-        error: {
-          type: 'ApplicationFailure',
-          subtype: 'InternalError',
-          message: 'An unexpected error occurred'
-        }
-      })
-    }
-  } catch (error) {
-    console.error('Unexpected error in invoice creation:', error)
-    return res.status(500).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'InternalError',
-        message: 'An unexpected error occurred'
-      }
+  if (result.isSuccess) {
+    return res.status(201).json({
+      invoice: result.value,
+      message: 'Invoice issued successfully'
     })
+  } else {
+    sendErrorResponse(res, result.error)
   }
-})
+}))
 
 /**
  * GET /api/sales/customers
@@ -226,48 +151,29 @@ router.post('/invoices', async (req, res) => {
  * - 400: Missing or invalid userId
  * - 500: Internal server error
  */
-router.get('/customers', async (req, res) => {
+router.get('/customers', wrapAsyncRoute(async (req, res) => {
   const { userId } = req.query
 
   if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'userId query parameter is required and must be a string'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'userId query parameter is required and must be a string'
     })
+    return
   }
 
-  try {
-    const result = await listCustomers(userId)
+  const result = await listCustomers(userId)
 
-    if (result.isSuccess) {
-      return res.json({
-        customers: result.value,
-        count: result.value.length
-      })
-    } else {
-      // Infrastructure error
-      return res.status(500).json({
-        error: {
-          type: 'ApplicationFailure',
-          subtype: 'InternalError',
-          message: 'An unexpected error occurred'
-        }
-      })
-    }
-  } catch (error) {
-    console.error('Unexpected error in listing customers:', error)
-    return res.status(500).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'InternalError',
-        message: 'An unexpected error occurred'
-      }
+  if (result.isSuccess) {
+    return res.json({
+      customers: result.value,
+      count: result.value.length
     })
+  } else {
+    sendErrorResponse(res, result.error)
   }
-})
+}))
 
 /**
  * GET /api/sales/customers/:customerId
@@ -282,57 +188,37 @@ router.get('/customers', async (req, res) => {
  * - 404: Customer not found
  * - 500: Internal server error
  */
-router.get('/customers/:customerId', async (req, res) => {
+router.get('/customers/:customerId', wrapAsyncRoute(async (req, res) => {
   const { userId } = req.query
   const { customerId } = req.params
 
   if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'userId query parameter is required and must be a string'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'userId query parameter is required and must be a string'
     })
+    return
   }
 
-  try {
-    const result = await findCustomerById(userId, customerId)
+  const result = await findCustomerById(userId, customerId)
 
-    if (result.isSuccess) {
-      if (result.value === null) {
-        return res.status(404).json({
-          error: {
-            type: 'DomainFailure',
-            subtype: 'CustomerNotFound',
-            message: `Customer ${customerId} not found or does not belong to the user`
-          }
-        })
-      }
-      return res.json({
-        customer: result.value
+  if (result.isSuccess) {
+    if (result.value === null) {
+      sendErrorResponse(res, {
+        type: 'DomainFailure',
+        subtype: 'CustomerNotFound',
+        message: `Customer ${customerId} not found or does not belong to the user`
       })
-    } else {
-      // Infrastructure error
-      return res.status(500).json({
-        error: {
-          type: 'ApplicationFailure',
-          subtype: 'InternalError',
-          message: 'An unexpected error occurred'
-        }
-      })
+      return
     }
-  } catch (error) {
-    console.error('Unexpected error in fetching customer:', error)
-    return res.status(500).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'InternalError',
-        message: 'An unexpected error occurred'
-      }
+    return res.json({
+      customer: result.value
     })
+  } else {
+    sendErrorResponse(res, result.error)
   }
-})
+}))
 
 /**
  * GET /api/sales/invoices
@@ -348,17 +234,16 @@ router.get('/customers/:customerId', async (req, res) => {
  * - 400: Missing or invalid userId
  * - 500: Internal server error
  */
-router.get('/invoices', async (req, res) => {
+router.get('/invoices', wrapAsyncRoute(async (req, res) => {
   const { userId, skip, take } = req.query
 
   if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'userId query parameter is required and must be a string'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'userId query parameter is required and must be a string'
     })
+    return
   }
 
   const options: { skip?: number; take?: number } = {}
@@ -375,35 +260,17 @@ router.get('/invoices', async (req, res) => {
     }
   }
 
-  try {
-    const result = await listSalesInvoices(userId, options)
+  const result = await listSalesInvoices(userId, options)
 
-    if (result.isSuccess) {
-      return res.json({
-        invoices: result.value,
-        count: result.value.length
-      })
-    } else {
-      // Infrastructure error
-      return res.status(500).json({
-        error: {
-          type: 'ApplicationFailure',
-          subtype: 'InternalError',
-          message: 'An unexpected error occurred'
-        }
-      })
-    }
-  } catch (error) {
-    console.error('Unexpected error in listing invoices:', error)
-    return res.status(500).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'InternalError',
-        message: 'An unexpected error occurred'
-      }
+  if (result.isSuccess) {
+    return res.json({
+      invoices: result.value,
+      count: result.value.length
     })
+  } else {
+    sendErrorResponse(res, result.error)
   }
-})
+}))
 
 /**
  * GET /api/sales/invoices/:invoiceId
@@ -418,73 +285,107 @@ router.get('/invoices', async (req, res) => {
  * - 404: Invoice not found
  * - 500: Internal server error
  */
-router.get('/invoices/:invoiceId', async (req, res) => {
+router.get('/invoices/:invoiceId', wrapAsyncRoute(async (req, res) => {
   const { userId } = req.query
   const { invoiceId } = req.params
 
   if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'MissingField',
-        message: 'userId query parameter is required and must be a string'
-      }
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'userId query parameter is required and must be a string'
     })
+    return
   }
 
-  try {
-    const result = await findSalesInvoiceById(userId, invoiceId)
+  const result = await findSalesInvoiceById(userId, invoiceId)
 
-    if (result.isSuccess) {
-      if (result.value === null) {
-        return res.status(404).json({
-          error: {
-            type: 'DomainFailure',
-            subtype: 'InvoiceNotFound',
-            message: `Invoice ${invoiceId} not found or does not belong to the user`
-          }
-        })
-      }
-      return res.json({
-        invoice: result.value
+  if (result.isSuccess) {
+    if (result.value === null) {
+      sendErrorResponse(res, {
+        type: 'DomainFailure',
+        subtype: 'InvoiceNotFound',
+        message: `Invoice ${invoiceId} not found or does not belong to the user`
       })
-    } else {
-      // Infrastructure error
-      return res.status(500).json({
-        error: {
-          type: 'ApplicationFailure',
-          subtype: 'InternalError',
-          message: 'An unexpected error occurred'
-        }
-      })
+      return
     }
-  } catch (error) {
-    console.error('Unexpected error in fetching invoice:', error)
-    return res.status(500).json({
-      error: {
-        type: 'ApplicationFailure',
-        subtype: 'InternalError',
-        message: 'An unexpected error occurred'
-      }
+    return res.json({
+      invoice: result.value
     })
+  } else {
+    sendErrorResponse(res, result.error)
   }
-})
+}))
 
 /**
  * POST /api/sales/invoices/:invoiceId/payments
  * Apply a payment to an invoice.
- * TODO: Implement this endpoint when the workflow is ready.
+ *
+ * Request Body:
+ * {
+ *   "userId": "string",
+ *   "amount": number (positive, up to 2 decimal places),
+ *   "date": "string" (ISO 8601),
+ *   "method": "string" (Cash, Check, CreditCard, BankTransfer),
+ *   "reference": "string" (optional)
+ * }
+ *
+ * Responses:
+ * - 201: Payment applied successfully
+ * - 400: Validation error (domain failure)
+ * - 404: Invoice not found
+ * - 500: Internal server error
  */
-router.post('/invoices/:invoiceId/payments', async (req, res) => {
-  // Placeholder for future implementation
-  return res.status(501).json({
-    error: {
+router.post('/invoices/:invoiceId/payments', wrapAsyncRoute(async (req, res) => {
+  const { userId, amount, date, method, reference } = req.body
+  const { invoiceId } = req.params
+
+  // Basic validation
+  if (!userId || typeof userId !== 'string') {
+    sendErrorResponse(res, {
       type: 'ApplicationFailure',
-      subtype: 'NotImplemented',
-      message: 'Apply payment to invoice endpoint is not yet implemented'
-    }
-  })
-})
+      subtype: 'MissingField',
+      message: 'userId is required and must be a string'
+    })
+    return
+  }
+  if (typeof amount !== 'number' || amount <= 0) {
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'amount must be a positive number'
+    })
+    return
+  }
+  if (!date || typeof date !== 'string') {
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'date is required and must be an ISO string'
+    })
+    return
+  }
+  if (!method || typeof method !== 'string') {
+    sendErrorResponse(res, {
+      type: 'ApplicationFailure',
+      subtype: 'MissingField',
+      message: 'method is required and must be a string'
+    })
+    return
+  }
+
+  const command: ApplyPaymentToInvoiceCommand = { userId, invoiceId, amount, date, method, reference }
+  const result = await applyPaymentToInvoiceWorkflow(command)
+
+  if (result.isSuccess) {
+    return res.status(201).json({
+      payment: result.value,
+      message: 'Payment applied successfully'
+    })
+  } else {
+    sendErrorResponse(res, result.error)
+  }
+}))
 
 /**
  * POST /api/sales/cash-sales

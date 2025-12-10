@@ -448,6 +448,125 @@ components:
         - status
         - createdAt
 
+    # Purchasing Context (additional schemas)
+    Loan:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        vendorId:
+          type: string
+          format: uuid
+        principal:
+          type: number
+          format: decimal
+        interestRate:
+          type: number
+          format: decimal
+        term:
+          type: integer
+          description: Loan term in months
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - vendorId
+        - principal
+        - interestRate
+        - term
+        - createdAt
+        - updatedAt
+
+    LoanPayment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        vendorId:
+          type: string
+          format: uuid
+        loanId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the loan being paid (optional)
+        principalAmount:
+          type: number
+          format: decimal
+        interestAmount:
+          type: number
+          format: decimal
+        date:
+          type: string
+          format: date-time
+        description:
+          type: string
+          nullable: true
+        journalEntryId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - vendorId
+        - principalAmount
+        - interestAmount
+        - date
+        - journalEntryId
+        - createdAt
+
+    CashExpense:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        vendorId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: decimal
+        date:
+          type: string
+          format: date-time
+        expenseCategory:
+          type: string
+        description:
+          type: string
+          nullable: true
+        journalEntryId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - vendorId
+        - amount
+        - date
+        - expenseCategory
+        - journalEntryId
+        - createdAt
+
     # PeriodClose Context
     Period:
       type: object

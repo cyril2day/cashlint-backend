@@ -7,7 +7,9 @@
     "test:unit": "vitest --watch --project unit",
     "test:integration": "vitest run --project integration",
     "test:all": "vitest run --project unit && pnpm test:integration",
-    "dev": "tsx src/api/server.ts"
+    "dev": "tsx src/api/server.ts",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:generate": "prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +29,7 @@
     "@types/node": "^24.10.1",
     "@types/ramda": "^0.31.1",
     "@types/supertest": "^6.0.3",
+    "@vitest/coverage-v8": "^4.0.15",
     "prisma": "^7.0.1",
     "supertest": "^7.1.4",
     "tsconfig-paths": "^4.2.0",

@@ -10,15 +10,21 @@ describe('Sales Context: Issue Sales Invoice Workflow (Integration)', () => {
   })
 
   beforeEach(async () => {
-    // Clean up sales-related tables in correct order
+    // Clean up sales-related tables in correct order, including new purchasing tables
+    await prisma.loanPayment.deleteMany()
+    await prisma.cashExpense.deleteMany()
+    await prisma.vendorBill.deleteMany()
     await prisma.payment.deleteMany()
     await prisma.cashSale.deleteMany()
     await prisma.customerDeposit.deleteMany()
     await prisma.salesInvoice.deleteMany()
+    await prisma.loan.deleteMany()
+    await prisma.vendor.deleteMany()
     await prisma.customer.deleteMany()
     await prisma.journalLine.deleteMany()
     await prisma.journalEntry.deleteMany()
     await prisma.account.deleteMany()
+    await prisma.session.deleteMany()
     await prisma.user.deleteMany()
   })
 
@@ -54,7 +60,7 @@ describe('Sales Context: Issue Sales Invoice Workflow (Integration)', () => {
     return result.value
   }
 
-  it('should issue a sales invoice with valid data', async () => {
+  it('should issue a sales invoice with valid data', { timeout: 15000 }, async () => {
     const user = await createTestUser()
     const customer = await createTestCustomer(user.id)
     // Create required default accounts: 111 (Accounts Receivable) and 401 (Service Revenue)

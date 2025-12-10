@@ -2,6 +2,7 @@ import { prisma } from '@/common/infrastructure/db'
 import { Result, Success, Failure } from '@/common/types/result'
 import { InfrastructureFailure } from '@/common/types/errors'
 import { Prisma, User } from '@/prisma/client'
+import { fromNullable, getOrElse } from '@/common/types/option'
 
 const safeDbCall = async <T>(promise: Promise<T>): Promise<Result<T>> => {
   try {
@@ -12,7 +13,9 @@ const safeDbCall = async <T>(promise: Promise<T>): Promise<Result<T>> => {
       return Failure(InfrastructureFailure('DuplicateKey', 'Username already exists'))
     }
 
-    return Failure(InfrastructureFailure('DatabaseError', e.message || 'Unknown DB error', e))
+    // Use Option to safely extract error message
+    const errorMessage = getOrElse('Unknown DB error')(fromNullable(e?.message))
+    return Failure(InfrastructureFailure('DatabaseError', errorMessage, e))
   }
 }
 

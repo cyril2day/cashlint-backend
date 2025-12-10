@@ -10,13 +10,22 @@ describe('Sales Context: Create Customer Workflow (Integration)', () => {
 
   // Clean up the database before every test to ensure isolation
   beforeEach(async () => {
+    // Delete child tables of JournalEntry and other parents
+    await prisma.loanPayment.deleteMany()
+    await prisma.cashExpense.deleteMany()
+    await prisma.vendorBill.deleteMany()
     await prisma.payment.deleteMany()
     await prisma.cashSale.deleteMany()
     await prisma.customerDeposit.deleteMany()
     await prisma.salesInvoice.deleteMany()
+    // Delete parents of the above (except JournalEntry and Vendor and Loan)
+    await prisma.loan.deleteMany()
+    await prisma.vendor.deleteMany()
     await prisma.customer.deleteMany()
+    // Now delete JournalEntry and its lines
     await prisma.journalLine.deleteMany()
     await prisma.journalEntry.deleteMany()
+    // Then delete Account, Session, User
     await prisma.account.deleteMany()
     await prisma.session.deleteMany()
     await prisma.user.deleteMany()

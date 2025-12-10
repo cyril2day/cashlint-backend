@@ -18,6 +18,11 @@ export type SalesDomainSubtype =
   | 'InvoiceNotFound'
   | 'DuplicateInvoiceNumber'
   | 'InvalidDueDate'
+  | 'InvalidPaymentAmount'
+  | 'PaymentDateInFuture'
+  | 'InvalidPaymentDate'
+  | 'CashSaleDateInFuture'
+  | 'InvalidCashSaleDate'
 
 export type SalesInfrastructureSubtype =
   | 'CustomerRepositoryError'
