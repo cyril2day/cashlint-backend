@@ -10,6 +10,7 @@ describe('Ledger Context: Create Account Workflow (Integration)', () => {
 
   // Clean up the database before every test to ensure isolation
   beforeEach(async () => {
+    await prisma.period.deleteMany()
     await prisma.payment.deleteMany()
     await prisma.loanPayment.deleteMany()
     await prisma.cashExpense.deleteMany()
