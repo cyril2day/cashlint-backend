@@ -25,6 +25,8 @@ describe('Sales Context: Create Customer Workflow (Integration)', () => {
     // Now delete JournalEntry and its lines
     await prisma.journalLine.deleteMany()
     await prisma.journalEntry.deleteMany()
+    // Delete Period (depends on User)
+    await prisma.period.deleteMany()
     // Then delete Account, Session, User
     await prisma.account.deleteMany()
     await prisma.session.deleteMany()

@@ -31,6 +31,7 @@ describe('Sales Context: Sales Invoice Repository (Infrastructure)', () => {
     await prisma.journalEntry.deleteMany()
     await prisma.account.deleteMany()
     await prisma.session.deleteMany()
+    await prisma.period.deleteMany()
     await prisma.user.deleteMany()
   })
 

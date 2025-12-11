@@ -24,6 +24,7 @@ describe('Identity Context: Create User Workflow (Integration)', () => {
     await prisma.customer.deleteMany()
     await prisma.account.deleteMany()
     await prisma.session.deleteMany()
+    await prisma.period.deleteMany()
     await prisma.user.deleteMany()
   })
 

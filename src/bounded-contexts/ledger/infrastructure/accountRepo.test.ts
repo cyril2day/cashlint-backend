@@ -5,15 +5,22 @@ import { prisma } from '@/common/infrastructure/db'
 describe('Ledger Context: Account Repository (Infrastructure)', () => {
   beforeEach(async () => {
     // Clear all dependent tables in correct order due to foreign keys
+    // Leaf children first, then parents
+    await prisma.loanPayment.deleteMany()
+    await prisma.cashExpense.deleteMany()
+    await prisma.vendorBill.deleteMany()
     await prisma.payment.deleteMany()
-    await prisma.salesInvoice.deleteMany()
     await prisma.cashSale.deleteMany()
     await prisma.customerDeposit.deleteMany()
+    await prisma.salesInvoice.deleteMany()
+    await prisma.loan.deleteMany()
+    await prisma.vendor.deleteMany()
     await prisma.customer.deleteMany()
     await prisma.journalLine.deleteMany()
     await prisma.journalEntry.deleteMany()
     await prisma.account.deleteMany()
     await prisma.session.deleteMany()
+    await prisma.period.deleteMany()
     await prisma.user.deleteMany()
 
     // Create test users for this test

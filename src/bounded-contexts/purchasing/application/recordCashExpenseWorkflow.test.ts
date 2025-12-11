@@ -27,6 +27,8 @@ describe('Purchasing Context: Record Cash Expense Workflow (Integration)', () =>
     await prisma.journalLine.deleteMany()
     // 5. JournalEntry (depends on User)
     await prisma.journalEntry.deleteMany()
+    // 5.5 Period (depends on User)
+    await prisma.period.deleteMany()
     // 6. Account (depends on User)
     await prisma.account.deleteMany()
     // 7. Session (depends on User)
