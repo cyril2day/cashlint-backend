@@ -10,12 +10,19 @@ describe('Purchasing Context: API Routes (Integration)', () => {
   })
 
   // Clean up the database before every test in the correct order to avoid FK constraints
+  // Order must respect foreign key dependencies: delete child tables before parent tables
   beforeEach(async () => {
+    await prisma.period.deleteMany()
+    await prisma.payment.deleteMany()
     await prisma.loanPayment.deleteMany()
-    await prisma.loan.deleteMany()
     await prisma.cashExpense.deleteMany()
     await prisma.vendorBill.deleteMany()
+    await prisma.salesInvoice.deleteMany()
+    await prisma.cashSale.deleteMany()
+    await prisma.customerDeposit.deleteMany()
+    await prisma.loan.deleteMany()
     await prisma.vendor.deleteMany()
+    await prisma.customer.deleteMany()
     await prisma.journalLine.deleteMany()
     await prisma.journalEntry.deleteMany()
     await prisma.account.deleteMany()

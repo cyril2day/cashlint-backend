@@ -11,6 +11,7 @@ describe('Sales Context: API Routes (Integration)', () => {
 
   // Clean up the database before every test in the correct order to avoid FK constraints
   beforeEach(async () => {
+    await prisma.period.deleteMany()
     await prisma.payment.deleteMany()
     await prisma.loanPayment.deleteMany()
     await prisma.cashExpense.deleteMany()

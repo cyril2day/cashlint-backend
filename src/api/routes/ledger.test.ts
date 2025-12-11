@@ -12,6 +12,7 @@ describe('Ledger Context: API Routes (Integration)', () => {
   // Clean up the database before every test to ensure isolation
   // Order matters due to foreign key constraints: delete dependent tables first
   beforeEach(async () => {
+    await prisma.period.deleteMany()
     await prisma.payment.deleteMany()
     await prisma.loanPayment.deleteMany()
     await prisma.cashExpense.deleteMany()
