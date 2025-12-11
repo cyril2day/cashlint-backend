@@ -57,9 +57,14 @@ const toDomainLoanPayment = (prismaPayment: any): LoanPayment => ({
 
 /**
  * Create a new loan payment in the database.
+ * If a transaction client is provided, the operation will be part of that transaction.
  */
-export const createLoanPayment = (payment: Omit<LoanPayment, 'id' | 'createdAt' | 'updatedAt'>): Promise<Result<LoanPayment>> => {
-  const action = prisma.loanPayment.create({
+export const createLoanPayment = (
+  payment: Omit<LoanPayment, 'id' | 'createdAt' | 'updatedAt'>,
+  tx?: Prisma.TransactionClient
+): Promise<Result<LoanPayment>> => {
+  const client = tx ?? prisma
+  const action = client.loanPayment.create({
     data: {
       loanId: payment.loanId,
       principalAmount: payment.principalAmount,

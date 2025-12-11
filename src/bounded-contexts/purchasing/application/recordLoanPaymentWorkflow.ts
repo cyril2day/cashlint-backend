@@ -10,6 +10,8 @@ import { PurchasingDomainSubtype } from '../domain/errors'
 import { JournalLineSide, Account } from '@/bounded-contexts/ledger/domain/ledger'
 import { DEFAULT_ACCOUNT_CODES } from '@/bounded-contexts/ledger/domain/defaultAccounts'
 import { fromNullable as optionFromNullable, getOrElse as optionGetOrElse } from '@/common/types/option'
+import { prisma } from '@/common/infrastructure/db'
+import { Prisma } from '@/prisma/client'
 
 /**
  * Workflow input: raw data from command (API request).
@@ -142,62 +144,86 @@ export const recordLoanPaymentWorkflow = async (command: RecordLoanPaymentComman
   }
   const interestExpenseAccountValue = interestExpenseAccountResult.value
 
-  // Step 6: Create journal entry
   const totalAmount = command.principalAmount + command.interestAmount
   const description = optionGetOrElse(`Loan payment for vendor ${command.vendorId}`)(optionFromNullable(command.description))
-  const journalEntryResult = await createJournalEntry({
-    userId: command.userId,
-    entryNumber: `LOAN-PAY-${Date.now()}`,
-    description,
-    date: new Date(command.date),
-    lines: [
-      {
-        accountId: notesPayableAccountValue.id!,
-        amount: command.principalAmount,
-        side: 'Debit' as JournalLineSide, // Reducing liability
-      },
-      {
-        accountId: interestExpenseAccountValue.id!,
-        amount: command.interestAmount,
-        side: 'Debit' as JournalLineSide, // Expense
-      },
-      {
-        accountId: cashAccountValue.id!,
-        amount: totalAmount,
-        side: 'Credit' as JournalLineSide, // Cash outflow
-      },
-    ],
-  })
 
-  if (!journalEntryResult.isSuccess) {
-    return journalEntryResult
+  try {
+    const payment = await prisma.$transaction(async (tx) => {
+      // Step 6: Create journal entry within transaction
+      const journalEntryResult = await createJournalEntry(
+        {
+          userId: command.userId,
+          entryNumber: `LOAN-PAY-${Date.now()}`,
+          description,
+          date: new Date(command.date),
+          lines: [
+            {
+              accountId: notesPayableAccountValue.id!,
+              amount: command.principalAmount,
+              side: 'Debit' as JournalLineSide,
+            },
+            {
+              accountId: interestExpenseAccountValue.id!,
+              amount: command.interestAmount,
+              side: 'Debit' as JournalLineSide,
+            },
+            {
+              accountId: cashAccountValue.id!,
+              amount: totalAmount,
+              side: 'Credit' as JournalLineSide,
+            },
+          ],
+        },
+        tx
+      )
+      if (!journalEntryResult.isSuccess) {
+        throw journalEntryResult.error
+      }
+      const journalEntry = journalEntryResult.value
+
+      // Step 7: Create loan payment record within transaction
+      const paymentToCreate: Omit<LoanPayment, 'id' | 'createdAt' | 'updatedAt'> = {
+        loanId: loan.id!,
+        principalAmount: command.principalAmount,
+        interestAmount: command.interestAmount,
+        date: new Date(command.date),
+        description: command.description,
+        journalEntryId: journalEntry.id!,
+      }
+
+      const paymentResult = await createLoanPayment(paymentToCreate, tx)
+      if (!paymentResult.isSuccess) {
+        throw paymentResult.error
+      }
+      const payment = paymentResult.value
+
+      // Step 8: Update loan principal within transaction
+      const newPrincipal = loan.principal - command.principalAmount
+      const updatePrincipalResult = await updateLoanPrincipal(command.userId, loan.id!, newPrincipal, tx)
+      if (!updatePrincipalResult.isSuccess) {
+        throw updatePrincipalResult.error
+      }
+
+      return payment
+    })
+    return Success(payment)
+  } catch (error) {
+    // The transaction has rolled back; convert error to a Result failure
+    if (
+      error &&
+      typeof error === 'object' &&
+      'type' in error &&
+      (error.type === 'DomainFailure' || error.type === 'InfrastructureFailure')
+    ) {
+      return Failure(error as any)
+    }
+    // Unknown error (e.g., Prisma error)
+    const message = error instanceof Error ? error.message : String(error)
+    return Failure(
+      DomainFailure(
+        'TransactionFailed' as PurchasingDomainSubtype,
+        `Transaction failed: ${message}`
+      )
+    )
   }
-
-  const journalEntry = journalEntryResult.value
-
-  // Step 7: Create loan payment record
-  const paymentToCreate: Omit<LoanPayment, 'id' | 'createdAt' | 'updatedAt'> = {
-    loanId: loan.id!,
-    principalAmount: command.principalAmount,
-    interestAmount: command.interestAmount,
-    date: new Date(command.date),
-    description: command.description,
-    journalEntryId: journalEntry.id!,
-  }
-
-  const paymentResult = await createLoanPayment(paymentToCreate)
-  if (!paymentResult.isSuccess) {
-    // TODO: Rollback journal entry? For now, leave orphaned.
-    return paymentResult
-  }
-
-  // Step 8: Update loan principal
-  const newPrincipal = loan.principal - command.principalAmount
-  const updatePrincipalResult = await updateLoanPrincipal(command.userId, loan.id!, newPrincipal)
-  if (!updatePrincipalResult.isSuccess) {
-    console.error('Failed to update loan principal', updatePrincipalResult.error)
-    // We still return the payment, but the loan principal is not updated.
-  }
-
-  return paymentResult
 }

@@ -9,6 +9,8 @@ import { SalesDomainSubtype } from '../domain/errors'
 import { JournalLineSide, Account } from '@/bounded-contexts/ledger/domain/ledger'
 import { DEFAULT_ACCOUNT_CODES } from '@/bounded-contexts/ledger/domain/defaultAccounts'
 import { fromNullable as optionFromNullable, getOrElse as optionGetOrElse } from '@/common/types/option'
+import { prisma } from '@/common/infrastructure/db'
+import { Prisma } from '@/prisma/client'
 
 /**
  * Workflow input: raw data from command (API request).
@@ -113,70 +115,86 @@ export const issueSalesInvoiceWorkflow = async (command: IssueSalesInvoiceComman
     return revenueAccount
   }
 
-  // Step 5: Create journal entry
-  // Extract account values safely (they are guaranteed non-null by ensureNotNull)
-  // TypeScript needs explicit typing, so we assert after success checks
-  if (!arAccount.isSuccess) return arAccount
-  if (!revenueAccount.isSuccess) return revenueAccount
+  // At this point, arAccount and revenueAccount are Success with non-null values
   const arAccountValue = arAccount.value as Account
   const revenueAccountValue = revenueAccount.value as Account
 
   const description = optionGetOrElse(`Sales invoice ${command.invoiceNumber}`)(optionFromNullable(command.description))
-  const journalEntryResult = await createJournalEntry({
-    userId: command.userId,
-    entryNumber: `INV-${command.invoiceNumber}`,
-    description,
-    date: new Date(command.date),
-    lines: [
-      {
-        accountId: arAccountValue.id!,
-        amount: command.total,
-        side: 'Debit' as JournalLineSide,
-      },
-      {
-        accountId: revenueAccountValue.id!,
-        amount: command.total,
-        side: 'Credit' as JournalLineSide,
-      },
-    ],
-  })
 
-  if (!journalEntryResult.isSuccess) {
-    return journalEntryResult
+  try {
+    const invoice = await prisma.$transaction(async (tx) => {
+      // Step 5: Create journal entry within transaction
+      const journalEntryResult = await createJournalEntry(
+        {
+          userId: command.userId,
+          entryNumber: `INV-${command.invoiceNumber}`,
+          description,
+          date: new Date(command.date),
+          lines: [
+            {
+              accountId: arAccountValue.id!,
+              amount: command.total,
+              side: 'Debit' as JournalLineSide,
+            },
+            {
+              accountId: revenueAccountValue.id!,
+              amount: command.total,
+              side: 'Credit' as JournalLineSide,
+            },
+          ],
+        },
+        tx
+      )
+      if (!journalEntryResult.isSuccess) {
+        throw journalEntryResult.error // This will roll back the transaction
+      }
+      const journalEntry = journalEntryResult.value
+
+      // Step 6: Create sales invoice within transaction
+      const invoiceToCreate: Omit<SalesInvoice, 'id' | 'createdAt' | 'updatedAt'> = {
+        userId: command.userId,
+        customerId: command.customerId,
+        invoiceNumber: command.invoiceNumber,
+        total: command.total,
+        status: 'Issued',
+        date: new Date(command.date),
+        dueDate: command.dueDate ? new Date(command.dueDate) : undefined,
+        description: command.description,
+        journalEntryId: journalEntry.id!,
+      }
+
+      const invoiceResult = await createSalesInvoice(invoiceToCreate, tx)
+      if (!invoiceResult.isSuccess) {
+        throw invoiceResult.error
+      }
+      const invoice = invoiceResult.value
+
+      // Step 7: Update customer balance within transaction
+      const updateBalanceResult = await updateCustomerBalance(command.userId, command.customerId, command.total, tx)
+      if (!updateBalanceResult.isSuccess) {
+        throw updateBalanceResult.error
+      }
+
+      return invoice
+    })
+    return Success(invoice)
+  } catch (error) {
+    // The transaction has rolled back; convert error to a Result failure
+    if (
+      error &&
+      typeof error === 'object' &&
+      'type' in error &&
+      (error.type === 'DomainFailure' || error.type === 'InfrastructureFailure')
+    ) {
+      return Failure(error as any)
+    }
+    // Unknown error (e.g., Prisma error)
+    const message = error instanceof Error ? error.message : String(error)
+    return Failure(
+      DomainFailure(
+        'TransactionFailed' as SalesDomainSubtype,
+        `Transaction failed: ${message}`
+      )
+    )
   }
-
-  const journalEntry = journalEntryResult.value
-
-  // Step 6: Create sales invoice
-  const invoiceToCreate: Omit<SalesInvoice, 'id' | 'createdAt' | 'updatedAt'> = {
-    userId: command.userId,
-    customerId: command.customerId,
-    invoiceNumber: command.invoiceNumber,
-    total: command.total,
-    status: 'Issued',
-    date: new Date(command.date),
-    dueDate: command.dueDate ? new Date(command.dueDate) : undefined,
-    description: command.description,
-    journalEntryId: journalEntry.id!,
-  }
-
-  const invoiceResult = await createSalesInvoice(invoiceToCreate)
-  if (!invoiceResult.isSuccess) {
-    // TODO: Rollback journal entry? For simplicity, we leave it (orphaned). In production, use a transaction.
-    return invoiceResult
-  }
-
-  // Step 7: Update customer balance (increase Accounts Receivable)
-  const updateBalanceResult = await updateCustomerBalance(command.userId, command.customerId, command.total)
-  if (!updateBalanceResult.isSuccess) {
-    // If this fails, we have an inconsistent state. For v1, we accept the risk and log.
-    // In a more robust system, we would roll back the previous steps.
-    console.error('Failed to update customer balance', updateBalanceResult.error)
-    // We still return the invoice as created, but the balance is off.
-    // This is a trade-off; we could return a failure, but then the invoice is created without balance update.
-    // We'll return the invoice but note the error? For now, we'll return the invoice.
-    // Alternatively, we could use a transaction that includes the balance update.
-  }
-
-  return invoiceResult
 }

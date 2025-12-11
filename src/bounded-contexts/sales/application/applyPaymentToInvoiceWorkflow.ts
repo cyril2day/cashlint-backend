@@ -9,6 +9,8 @@ import { DomainFailure } from '@/common/types/errors'
 import { SalesDomainSubtype } from '../domain/errors'
 import { JournalLineSide } from '@/bounded-contexts/ledger/domain/ledger'
 import { DEFAULT_ACCOUNT_CODES } from '@/bounded-contexts/ledger/domain/defaultAccounts'
+import { prisma } from '@/common/infrastructure/db'
+import { Prisma } from '@/prisma/client'
 
 /**
  * Workflow input: raw data from command (API request).
@@ -122,61 +124,86 @@ export const applyPaymentToInvoiceWorkflow = async (command: ApplyPaymentToInvoi
     )
   }
 
-  // Step 6: Create journal entry
-  const journalEntryResult = await createJournalEntry({
-    userId: command.userId,
-    entryNumber: `PAY-${Date.now()}`,
-    description: `Payment for invoice ${invoice.invoiceNumber}`,
-    date: validatedPayment.date,
-    lines: [
-      {
-        accountId: cashAccount.id!,
-        amount: validatedPayment.amount,
-        side: 'Debit' as JournalLineSide,
-      },
-      {
-        accountId: arAccount.id!,
-        amount: validatedPayment.amount,
-        side: 'Credit' as JournalLineSide,
-      },
-    ],
-  })
+  try {
+    const payment = await prisma.$transaction(async (tx) => {
+      // Step 6: Create journal entry within transaction
+      const journalEntryResult = await createJournalEntry(
+        {
+          userId: command.userId,
+          entryNumber: `PAY-${Date.now()}`,
+          description: `Payment for invoice ${invoice.invoiceNumber}`,
+          date: validatedPayment.date,
+          lines: [
+            {
+              accountId: cashAccount.id!,
+              amount: validatedPayment.amount,
+              side: 'Debit' as JournalLineSide,
+            },
+            {
+              accountId: arAccount.id!,
+              amount: validatedPayment.amount,
+              side: 'Credit' as JournalLineSide,
+            },
+          ],
+        },
+        tx
+      )
+      if (!journalEntryResult.isSuccess) {
+        throw journalEntryResult.error // This will roll back the transaction
+      }
+      const journalEntry = journalEntryResult.value
 
-  if (!journalEntryResult.isSuccess) {
-    return journalEntryResult
+      // Step 7: Create payment record within transaction
+      const paymentResult = await createPayment(
+        {
+          invoiceId: command.invoiceId,
+          amount: validatedPayment.amount,
+          date: validatedPayment.date,
+          method: validatedPayment.method,
+          reference: validatedPayment.reference,
+          journalEntryId: journalEntry.id!,
+        },
+        tx
+      )
+      if (!paymentResult.isSuccess) {
+        throw paymentResult.error
+      }
+      const payment = paymentResult.value
+
+      // Step 8: Update invoice status within transaction
+      const newStatus = validatedPayment.amount === openAmount ? 'Paid' : 'PartiallyPaid'
+      const statusUpdateResult = await updateSalesInvoiceStatus(command.userId, command.invoiceId, newStatus, tx)
+      if (!statusUpdateResult.isSuccess) {
+        throw statusUpdateResult.error
+      }
+
+      // Step 9: Update customer balance within transaction
+      const balanceUpdateResult = await updateCustomerBalance(command.userId, invoice.customerId, -validatedPayment.amount, tx)
+      if (!balanceUpdateResult.isSuccess) {
+        throw balanceUpdateResult.error
+      }
+
+      return payment
+    })
+    return Success(payment)
+  } catch (error) {
+    // The transaction has rolled back; convert error to a Result failure
+    // Since the error thrown is an AppError (from our repositories), we can return Failure directly.
+    if (
+      error &&
+      typeof error === 'object' &&
+      'type' in error &&
+      (error.type === 'DomainFailure' || error.type === 'InfrastructureFailure')
+    ) {
+      return Failure(error as any)
+    }
+    // Unknown error (e.g., Prisma error)
+    const message = error instanceof Error ? error.message : String(error)
+    return Failure(
+      DomainFailure(
+        'TransactionFailed' as SalesDomainSubtype,
+        `Transaction failed: ${message}`
+      )
+    )
   }
-  const journalEntry = journalEntryResult.value
-
-  // Step 7: Create payment record
-  const paymentResult = await createPayment({
-    invoiceId: command.invoiceId,
-    amount: validatedPayment.amount,
-    date: validatedPayment.date,
-    method: validatedPayment.method,
-    reference: validatedPayment.reference,
-    journalEntryId: journalEntry.id!,
-  })
-
-  if (!paymentResult.isSuccess) {
-    // TODO: Rollback journal entry? For now, we leave it orphaned.
-    return paymentResult
-  }
-  const payment = paymentResult.value
-
-  // Step 8: Update invoice status
-  const newStatus = validatedPayment.amount === openAmount ? 'Paid' : 'PartiallyPaid'
-  const statusUpdateResult = await updateSalesInvoiceStatus(command.userId, command.invoiceId, newStatus)
-  if (!statusUpdateResult.isSuccess) {
-    // If this fails, we have inconsistent status. Log and continue.
-    console.error('Failed to update invoice status', statusUpdateResult.error)
-  }
-
-  // Step 9: Update customer balance (decrease Accounts Receivable)
-  const balanceUpdateResult = await updateCustomerBalance(command.userId, invoice.customerId, -validatedPayment.amount)
-  if (!balanceUpdateResult.isSuccess) {
-    console.error('Failed to update customer balance', balanceUpdateResult.error)
-    // We still return the payment, but the balance is off.
-  }
-
-  return Success(payment)
 }
