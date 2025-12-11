@@ -31,6 +31,33 @@ enum JournalLineSide {
   Credit
 }
 
+enum InvoiceStatus {
+  Draft
+  Issued
+  PartiallyPaid
+  Paid
+  Overdue
+}
+
+enum PaymentMethod {
+  Cash
+  Check
+  CreditCard
+  BankTransfer
+}
+
+enum VendorBillStatus {
+  Draft
+  Recorded
+  PartiallyPaid
+  Paid
+}
+
+enum PeriodStatus {
+  Open
+  Closed
+}
+
 model User {
   id        String    @id @default(uuid())
   username  String    @unique
@@ -38,6 +65,15 @@ model User {
   sessions  Session[]
   accounts  Account[]
   journalEntries JournalEntry[]
+  customers Customer[]
+  salesInvoices SalesInvoice[]
+  cashSales CashSale[]
+  customerDeposits CustomerDeposit[]
+  vendors   Vendor[]
+  vendorBills VendorBill[]
+  loans     Loan[]
+  cashExpenses CashExpense[]
+  periods   Period[]
 }
 
 model Session {
@@ -67,9 +103,16 @@ model JournalEntry {
   description String
   date        DateTime
   createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  updatedAt    DateTime      @updatedAt
   user        User          @relation(fields: [userId], references: [id])
   lines       JournalLine[]
+  salesInvoice SalesInvoice? // reverse relation
+  payment      Payment?      // reverse relation
+  cashSale     CashSale?     // reverse relation
+  customerDeposit CustomerDeposit? // reverse relation
+  vendorBill   VendorBill?   // reverse relation
+  loanPayment  LoanPayment?  // reverse relation
+  cashExpense  CashExpense?  // reverse relation
 }
 
 model JournalLine {
@@ -81,4 +124,173 @@ model JournalLine {
   createdAt       DateTime       @default(now())
   journalEntry    JournalEntry   @relation(fields: [journalEntryId], references: [id])
   account         Account        @relation(fields: [accountId], references: [id])
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  email     String?
+  balance   Decimal  @default(0)   // subsidiary balance (Accounts Receivable)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+  invoices  SalesInvoice[]
+  cashSales CashSale[]
+  deposits  CustomerDeposit[]
+}
+
+model SalesInvoice {
+  id             String         @id @default(uuid())
+  userId         String
+  customerId     String
+  invoiceNumber  String
+  total          Decimal
+  status         InvoiceStatus  @default(Draft)
+  date           DateTime
+  dueDate        DateTime?
+  description    String?
+  journalEntryId String         @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id])
+  customer       Customer       @relation(fields: [customerId], references: [id])
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  payments       Payment[]
+}
+
+model Payment {
+  id             String         @id @default(uuid())
+  invoiceId      String
+  amount         Decimal
+  date           DateTime
+  method         PaymentMethod
+  reference      String?
+  journalEntryId String         @unique
+  createdAt      DateTime       @default(now())
+  invoice        SalesInvoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+}
+
+model CashSale {
+  id             String         @id @default(uuid())
+  userId         String
+  customerId     String
+  amount         Decimal
+  date           DateTime
+  description    String?
+  journalEntryId String         @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id])
+  customer       Customer       @relation(fields: [customerId], references: [id])
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+}
+
+model CustomerDeposit {
+  id             String         @id @default(uuid())
+  userId         String
+  customerId     String
+  amount         Decimal
+  date           DateTime
+  description    String?
+  journalEntryId String         @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id])
+  customer       Customer       @relation(fields: [customerId], references: [id])
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+}
+
+// --- Purchasing Context Models ---
+
+model Vendor {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  email     String?
+  balance   Decimal  @default(0)   // subsidiary balance (Accounts Payable)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+  bills     VendorBill[]
+  loans     Loan[]
+  cashExpenses CashExpense[]
+}
+
+model VendorBill {
+  id             String           @id @default(uuid())
+  userId         String
+  vendorId       String
+  billNumber     String
+  amount         Decimal
+  date           DateTime
+  dueDate        DateTime?
+  description    String?
+  status         VendorBillStatus @default(Draft)
+  journalEntryId String           @unique
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  user           User             @relation(fields: [userId], references: [id])
+  vendor         Vendor           @relation(fields: [vendorId], references: [id])
+  journalEntry   JournalEntry     @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+}
+
+model Loan {
+  id           String   @id @default(uuid())
+  userId       String
+  vendorId     String
+  principal    Decimal
+  interestRate Decimal? // annual interest rate as percentage (e.g., 5.0)
+  term         Int?     // term in months
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+  vendor       Vendor   @relation(fields: [vendorId], references: [id])
+  payments     LoanPayment[]
+}
+
+model LoanPayment {
+  id             String         @id @default(uuid())
+  loanId         String
+  principalAmount Decimal
+  interestAmount Decimal
+  date           DateTime
+  description    String?
+  journalEntryId String         @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  loan           Loan           @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+}
+
+model CashExpense {
+  id             String         @id @default(uuid())
+  userId         String
+  vendorId       String
+  amount         Decimal
+  date           DateTime
+  expenseCategory String
+  description    String?
+  journalEntryId String         @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id])
+  vendor         Vendor         @relation(fields: [vendorId], references: [id])
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+}
+
+model Period {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  status    PeriodStatus
+  closedAt  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, name])
 }

@@ -10,10 +10,22 @@ describe('Ledger Context: Journal Entry Repository (Infrastructure)', () => {
 
   // Clean up before each test
   beforeEach(async () => {
+    // Delete leaf children first, then parents
+    await prisma.loanPayment.deleteMany()
+    await prisma.cashExpense.deleteMany()
+    await prisma.vendorBill.deleteMany()
+    await prisma.payment.deleteMany()
+    await prisma.cashSale.deleteMany()
+    await prisma.customerDeposit.deleteMany()
+    await prisma.salesInvoice.deleteMany()
+    await prisma.loan.deleteMany()
+    await prisma.vendor.deleteMany()
+    await prisma.customer.deleteMany()
     await prisma.journalLine.deleteMany()
     await prisma.journalEntry.deleteMany()
     await prisma.account.deleteMany()
     await prisma.session.deleteMany()
+    await prisma.period.deleteMany()
     await prisma.user.deleteMany()
   })
 
@@ -69,10 +81,13 @@ describe('Ledger Context: Journal Entry Repository (Infrastructure)', () => {
       expect(entry.userId).toBe(user.id)
       expect(entry.description).toBe('Cash sale')
       expect(entry.lines).toHaveLength(2)
-      expect(entry.lines[0].amount).toBe(500)
-      expect(entry.lines[0].side).toBe('Debit')
-      expect(entry.lines[1].amount).toBe(500)
-      expect(entry.lines[1].side).toBe('Credit')
+      // Check that we have one Debit and one Credit, amounts correct
+      const debitLine = entry.lines.find(line => line.side === 'Debit')
+      const creditLine = entry.lines.find(line => line.side === 'Credit')
+      expect(debitLine).toBeDefined()
+      expect(creditLine).toBeDefined()
+      expect(debitLine!.amount).toBe(500)
+      expect(creditLine!.amount).toBe(500)
       expect(entry.id).toBeDefined()
       expect(entry.createdAt).toBeInstanceOf(Date)
     } else {

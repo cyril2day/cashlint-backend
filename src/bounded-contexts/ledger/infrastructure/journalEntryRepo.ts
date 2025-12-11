@@ -4,6 +4,7 @@ import { InfrastructureFailure } from '@/common/types/errors'
 import { Prisma } from '@/prisma/client'
 import { JournalEntry, JournalLine, JournalLineSide } from '../domain/ledger'
 import { LedgerInfrastructureSubtype } from '../domain/errors'
+import { fromNullable, getOrElse } from '@/common/types/option'
 
 const safeDbCall = async <T>(promise: Promise<T>): Promise<Result<T>> => {
   try {
@@ -31,10 +32,11 @@ const safeDbCall = async <T>(promise: Promise<T>): Promise<Result<T>> => {
       )
     }
     // unknown error
+    const errorMessage = getOrElse('Unknown database error')(fromNullable(e?.message))
     return Failure(
       InfrastructureFailure(
         'JournalEntryRepositoryError' as LedgerInfrastructureSubtype,
-        e.message || 'Unknown database error',
+        errorMessage,
         e
       )
     )

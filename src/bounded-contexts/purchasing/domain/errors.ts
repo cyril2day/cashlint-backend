@@ -1,0 +1,43 @@
+// Purchasing-specific error subtypes
+
+export type PurchasingDomainSubtype =
+  | 'InvalidVendorName'
+  | 'InvalidVendorEmail'
+  | 'InvalidBillNumber'
+  | 'InvalidBillTotal'
+  | 'InvalidBillDate'
+  | 'BillDateInFuture'
+  | 'PaymentDateInFuture'
+  | 'InvalidPaymentDate'
+  | 'InvalidDueDate'
+  | 'InvalidLoanPrincipal'
+  | 'InvalidInterestRate'
+  | 'InvalidLoanTerm'
+  | 'InvalidPaymentPrincipal'
+  | 'InvalidPaymentInterest'
+  | 'InvalidExpenseAmount'
+  | 'InvalidExpenseCategory'
+  | 'VendorNotFound'
+  | 'BillNotFound'
+  | 'LoanNotFound'
+  | 'AccountNotFound'
+  | 'DuplicateBillNumber'
+  | 'PaymentExceedsOpenAmount'
+  | 'PaymentExceedsLoanPrincipal'
+  | 'InvalidVendorBalance'
+  | 'InvalidBillStatus'
+
+export type PurchasingInfrastructureSubtype =
+  | 'VendorRepositoryError'
+  | 'VendorBillRepositoryError'
+  | 'LoanRepositoryError'
+  | 'LoanPaymentRepositoryError'
+  | 'CashExpenseRepositoryError'
+  | 'DatabaseConnectionError'
+  | 'DuplicateKey'
+
+export type PurchasingApplicationSubtype =
+  | 'InvalidCommand'
+  | 'MissingPayload'
+  | 'UserNotFound'
+  | 'VendorMismatch'

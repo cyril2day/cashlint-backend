@@ -4,17 +4,24 @@ import { prisma } from '@/common/infrastructure/db'
 
 describe('Ledger Context: Account Repository (Infrastructure)', () => {
   beforeEach(async () => {
-    // Clear ledger-related tables in correct order due to foreign keys
+    // Clear all dependent tables in correct order due to foreign keys
+    // Leaf children first, then parents
+    await prisma.loanPayment.deleteMany()
+    await prisma.cashExpense.deleteMany()
+    await prisma.vendorBill.deleteMany()
+    await prisma.payment.deleteMany()
+    await prisma.cashSale.deleteMany()
+    await prisma.customerDeposit.deleteMany()
+    await prisma.salesInvoice.deleteMany()
+    await prisma.loan.deleteMany()
+    await prisma.vendor.deleteMany()
+    await prisma.customer.deleteMany()
     await prisma.journalLine.deleteMany()
     await prisma.journalEntry.deleteMany()
     await prisma.account.deleteMany()
-
-    // Delete the specific test users (by id) to start fresh
-    await prisma.user.deleteMany({
-      where: {
-        id: { in: ['test-user-123', 'another-user-456'] },
-      },
-    })
+    await prisma.session.deleteMany()
+    await prisma.period.deleteMany()
+    await prisma.user.deleteMany()
 
     // Create test users for this test
     await prisma.user.create({
@@ -32,7 +39,44 @@ describe('Ledger Context: Account Repository (Infrastructure)', () => {
   })
 
   afterAll(async () => {
-    // Clean up test users and their related data
+    // Clean up test users and their related data in correct order
+    await prisma.payment.deleteMany({
+      where: {
+        invoice: {
+          user: {
+            id: { in: ['test-user-123', 'another-user-456'] },
+          },
+        },
+      },
+    })
+    await prisma.salesInvoice.deleteMany({
+      where: {
+        user: {
+          id: { in: ['test-user-123', 'another-user-456'] },
+        },
+      },
+    })
+    await prisma.cashSale.deleteMany({
+      where: {
+        user: {
+          id: { in: ['test-user-123', 'another-user-456'] },
+        },
+      },
+    })
+    await prisma.customerDeposit.deleteMany({
+      where: {
+        user: {
+          id: { in: ['test-user-123', 'another-user-456'] },
+        },
+      },
+    })
+    await prisma.customer.deleteMany({
+      where: {
+        user: {
+          id: { in: ['test-user-123', 'another-user-456'] },
+        },
+      },
+    })
     await prisma.journalLine.deleteMany({
       where: {
         journalEntry: {

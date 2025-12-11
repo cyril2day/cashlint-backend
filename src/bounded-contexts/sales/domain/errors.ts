@@ -1,0 +1,40 @@
+// Sales-specific error subtypes
+
+export type SalesDomainSubtype =
+  | 'InvalidCustomerName'
+  | 'InvalidCustomerEmail'
+  | 'InvalidInvoiceNumber'
+  | 'InvalidInvoiceTotal'
+  | 'InvalidInvoiceStatus'
+  | 'InvoiceTotalMustBePositive'
+  | 'InvoiceDateInFuture'
+  | 'PaymentExceedsOpenAmount'
+  | 'PaymentAmountMustBePositive'
+  | 'InvalidPaymentMethod'
+  | 'InvalidPaymentReference'
+  | 'CashSaleAmountMustBePositive'
+  | 'DepositAmountMustBePositive'
+  | 'CustomerNotFound'
+  | 'InvoiceNotFound'
+  | 'DuplicateInvoiceNumber'
+  | 'InvalidDueDate'
+  | 'InvalidPaymentAmount'
+  | 'PaymentDateInFuture'
+  | 'InvalidPaymentDate'
+  | 'CashSaleDateInFuture'
+  | 'InvalidCashSaleDate'
+
+export type SalesInfrastructureSubtype =
+  | 'CustomerRepositoryError'
+  | 'SalesInvoiceRepositoryError'
+  | 'PaymentRepositoryError'
+  | 'CashSaleRepositoryError'
+  | 'CustomerDepositRepositoryError'
+  | 'DatabaseConnectionError'
+  | 'DuplicateKey'
+
+export type SalesApplicationSubtype =
+  | 'InvalidCommand'
+  | 'MissingPayload'
+  | 'UserNotFound'
+  | 'CustomerMismatch'

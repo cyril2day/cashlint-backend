@@ -1,7 +1,6 @@
 import { validateUsername } from '@/bounded-contexts/identity/domain/user'
-import { createUser } from '@/bounded-contexts/identity/infrastructure/userRepo'
+import { createUserWithDefaultAccounts } from '@/bounded-contexts/identity/infrastructure/userWithAccountsRepo'
 import { andThenAsync } from '@/common/types/result'
-import { User } from '@/prisma/client'
 
 /**
  * Create User Workflow - Application Layer
@@ -9,7 +8,7 @@ import { User } from '@/prisma/client'
  * Composes domain validation with infrastructure persistence using railway-oriented programming.
  * This workflow orchestrates the business process of creating a user:
  * 1. Validate username (pure domain logic)
- * 2. Persist user to database (infrastructure I/O)
+ * 2. Persist user AND create default Chart of Accounts in a single transaction (infrastructure I/O)
  * 
  * Uses andThenAsync to chain the async infrastructure operation after the pure domain validation.
  */
@@ -17,8 +16,8 @@ export const createUserWorkflow = async (username: string) => {
   // Start with domain validation (pure calculation)
   const validationResult = validateUsername(username)
   
-  // Chain with infrastructure persistence (async action)
-  const workflowResult = await andThenAsync(createUser)(validationResult)
+  // Chain with infrastructure persistence (async action) that also creates default accounts
+  const workflowResult = await andThenAsync(createUserWithDefaultAccounts)(validationResult)
   
   return workflowResult
 }

@@ -219,7 +219,7 @@ describe('Ledger Domain Validation Functions', () => {
       const result = validateJournalEntry(entry)
       expect(result.isSuccess).toBe(false)
       if (!result.isSuccess) {
-        expect(result.error.message).toMatch(/Description must be between/)
+        expect(result.error.message).toBe('Must be between 1 and 500 characters')
       }
     })
 
