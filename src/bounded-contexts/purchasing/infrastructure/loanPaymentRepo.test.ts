@@ -10,6 +10,8 @@ describe('Purchasing Context: Loan Payment Repository (Infrastructure)', () => {
   // Clean up before each test
   beforeEach(async () => {
     // Delete in correct order, respecting foreign keys
+    // 0. Period (depends on User, but must be deleted before User due to foreign key)
+    await prisma.period.deleteMany()
     // 1. Child tables of JournalEntry (that are not already in purchasing)
     await prisma.payment.deleteMany()
     await prisma.salesInvoice.deleteMany()
