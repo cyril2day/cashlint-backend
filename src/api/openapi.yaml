@@ -673,6 +673,253 @@ components:
         - generatedAt
         - data
 
+    # New Reporting Schemas matching our implementation
+    IncomeStatement:
+      type: object
+      properties:
+        period:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date-time
+            endDate:
+              type: string
+              format: date-time
+          required:
+            - startDate
+            - endDate
+        revenues:
+          type: array
+          items:
+            type: object
+            properties:
+              accountCode:
+                type: string
+              accountName:
+                type: string
+              amount:
+                type: number
+                format: decimal
+            required:
+              - accountCode
+              - accountName
+              - amount
+        expenses:
+          type: array
+          items:
+            type: object
+            properties:
+              accountCode:
+                type: string
+              accountName:
+                type: string
+              amount:
+                type: number
+                format: decimal
+            required:
+              - accountCode
+              - accountName
+              - amount
+        revenueTotal:
+          type: number
+          format: decimal
+        expenseTotal:
+          type: number
+          format: decimal
+        netIncome:
+          type: number
+          format: decimal
+      required:
+        - period
+        - revenues
+        - expenses
+        - revenueTotal
+        - expenseTotal
+        - netIncome
+
+    BalanceSheet:
+      type: object
+      properties:
+        asOfDate:
+          type: string
+          format: date-time
+        assets:
+          type: array
+          items:
+            type: object
+            properties:
+              accountCode:
+                type: string
+              accountName:
+                type: string
+              amount:
+                type: number
+                format: decimal
+            required:
+              - accountCode
+              - accountName
+              - amount
+        liabilities:
+          type: array
+          items:
+            type: object
+            properties:
+              accountCode:
+                type: string
+              accountName:
+                type: string
+              amount:
+                type: number
+                format: decimal
+            required:
+              - accountCode
+              - accountName
+              - amount
+        equity:
+          type: array
+          items:
+            type: object
+            properties:
+              accountCode:
+                type: string
+              accountName:
+                type: string
+              amount:
+                type: number
+                format: decimal
+            required:
+              - accountCode
+              - accountName
+              - amount
+        assetTotal:
+          type: number
+          format: decimal
+        liabilityTotal:
+          type: number
+          format: decimal
+        equityTotal:
+          type: number
+          format: decimal
+      required:
+        - asOfDate
+        - assets
+        - liabilities
+        - equity
+        - assetTotal
+        - liabilityTotal
+        - equityTotal
+
+    StatementOfOwnersEquity:
+      type: object
+      properties:
+        period:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date-time
+            endDate:
+              type: string
+              format: date-time
+          required:
+            - startDate
+            - endDate
+        beginningCapital:
+          type: number
+          format: decimal
+        additionalContributions:
+          type: number
+          format: decimal
+        netIncome:
+          type: number
+          format: decimal
+        drawings:
+          type: number
+          format: decimal
+        endingCapital:
+          type: number
+          format: decimal
+      required:
+        - period
+        - beginningCapital
+        - additionalContributions
+        - netIncome
+        - drawings
+        - endingCapital
+
+    StatementOfCashFlows:
+      type: object
+      properties:
+        period:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date-time
+            endDate:
+              type: string
+              format: date-time
+          required:
+            - startDate
+            - endDate
+        operatingActivities:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              amount:
+                type: number
+                format: decimal
+            required:
+              - description
+              - amount
+        investingActivities:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              amount:
+                type: number
+                format: decimal
+            required:
+              - description
+              - amount
+        financingActivities:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              amount:
+                type: number
+                format: decimal
+            required:
+              - description
+              - amount
+        netCashChange:
+          type: number
+          format: decimal
+        beginningCash:
+          type: number
+          format: decimal
+        endingCash:
+          type: number
+          format: decimal
+      required:
+        - period
+        - operatingActivities
+        - investingActivities
+        - financingActivities
+        - netCashChange
+        - beginningCash
+        - endingCash
+
     # Common Response Schemas
     ErrorResponse:
       type: object
@@ -1828,7 +2075,7 @@ paths:
         '500':
           $ref: '#/components/schemas/ErrorResponse'
 
-  # Reporting Context (read-only)
+  # Reporting Context (updated to match actual response schemas)
   /api/reporting/income-statement:
     get:
       summary: Generate income statement
@@ -1858,8 +2105,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FinancialStatement'
+                type: object
+                properties:
+                  incomeStatement:
+                    $ref: '#/components/schemas/IncomeStatement'
+                required:
+                  - incomeStatement
         '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '404':
           $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/schemas/ErrorResponse'
@@ -1887,8 +2141,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FinancialStatement'
+                type: object
+                properties:
+                  balanceSheet:
+                    $ref: '#/components/schemas/BalanceSheet'
+                required:
+                  - balanceSheet
         '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '404':
           $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/schemas/ErrorResponse'
@@ -1922,8 +2183,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FinancialStatement'
+                type: object
+                properties:
+                  statementOfOwnersEquity:
+                    $ref: '#/components/schemas/StatementOfOwnersEquity'
+                required:
+                  - statementOfOwnersEquity
         '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '404':
           $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/schemas/ErrorResponse'
@@ -1957,8 +2225,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FinancialStatement'
+                type: object
+                properties:
+                  statementOfCashFlows:
+                    $ref: '#/components/schemas/StatementOfCashFlows'
+                required:
+                  - statementOfCashFlows
         '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '404':
           $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/schemas/ErrorResponse'
