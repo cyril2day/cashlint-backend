@@ -58,9 +58,14 @@ const toDomainCashExpense = (prismaExpense: any): CashExpense => ({
 
 /**
  * Create a new cash expense in the database.
+ * If a transaction client is provided, the operation will be part of that transaction.
  */
-export const createCashExpense = (expense: Omit<CashExpense, 'id' | 'createdAt' | 'updatedAt'>): Promise<Result<CashExpense>> => {
-  const action = prisma.cashExpense.create({
+export const createCashExpense = (
+  expense: Omit<CashExpense, 'id' | 'createdAt' | 'updatedAt'>,
+  tx?: Prisma.TransactionClient
+): Promise<Result<CashExpense>> => {
+  const client = tx ?? prisma
+  const action = client.cashExpense.create({
     data: {
       userId: expense.userId,
       vendorId: expense.vendorId,

@@ -104,9 +104,16 @@ export const listVendors = (userId: string): Promise<Result<Vendor[]>> => {
 /**
  * Update vendor balance by adding an amount (positive or negative).
  * This is a specialized function for updating the subsidiary balance.
+ * If a transaction client is provided, the operation will be part of that transaction.
  */
-export const updateVendorBalance = (userId: string, vendorId: string, amountDelta: number): Promise<Result<Vendor>> => {
-  const action = prisma.vendor.update({
+export const updateVendorBalance = (
+  userId: string,
+  vendorId: string,
+  amountDelta: number,
+  tx?: Prisma.TransactionClient
+): Promise<Result<Vendor>> => {
+  const client = tx ?? prisma
+  const action = client.vendor.update({
     where: { id: vendorId, userId },
     data: {
       balance: { increment: amountDelta },

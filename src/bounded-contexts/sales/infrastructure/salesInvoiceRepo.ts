@@ -60,9 +60,14 @@ const toDomainSalesInvoice = (prismaInvoice: any): SalesInvoice => ({
 
 /**
  * Create a new sales invoice in the database.
+ * If a transaction client is provided, the operation will be part of that transaction.
  */
-export const createSalesInvoice = (invoice: Omit<SalesInvoice, 'id' | 'createdAt' | 'updatedAt'>): Promise<Result<SalesInvoice>> => {
-  const action = prisma.salesInvoice.create({
+export const createSalesInvoice = (
+  invoice: Omit<SalesInvoice, 'id' | 'createdAt' | 'updatedAt'>,
+  tx?: Prisma.TransactionClient
+): Promise<Result<SalesInvoice>> => {
+  const client = tx ?? prisma
+  const action = client.salesInvoice.create({
     data: {
       userId: invoice.userId,
       customerId: invoice.customerId,
@@ -130,9 +135,16 @@ export const listSalesInvoices = (userId: string, options?: { skip?: number; tak
 
 /**
  * Update the status of a sales invoice.
+ * If a transaction client is provided, the operation will be part of that transaction.
  */
-export const updateSalesInvoiceStatus = (userId: string, invoiceId: string, status: InvoiceStatus): Promise<Result<SalesInvoice>> => {
-  const action = prisma.salesInvoice.update({
+export const updateSalesInvoiceStatus = (
+  userId: string,
+  invoiceId: string,
+  status: InvoiceStatus,
+  tx?: Prisma.TransactionClient
+): Promise<Result<SalesInvoice>> => {
+  const client = tx ?? prisma
+  const action = client.salesInvoice.update({
     where: { id: invoiceId, userId },
     data: { status },
   })

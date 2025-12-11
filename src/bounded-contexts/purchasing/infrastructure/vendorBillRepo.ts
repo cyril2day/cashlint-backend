@@ -60,9 +60,14 @@ const toDomainVendorBill = (prismaBill: any): VendorBill => ({
 
 /**
  * Create a new vendor bill in the database.
+ * If a transaction client is provided, the operation will be part of that transaction.
  */
-export const createVendorBill = (bill: Omit<VendorBill, 'id' | 'createdAt' | 'updatedAt'>): Promise<Result<VendorBill>> => {
-  const action = prisma.vendorBill.create({
+export const createVendorBill = (
+  bill: Omit<VendorBill, 'id' | 'createdAt' | 'updatedAt'>,
+  tx?: Prisma.TransactionClient
+): Promise<Result<VendorBill>> => {
+  const client = tx ?? prisma
+  const action = client.vendorBill.create({
     data: {
       userId: bill.userId,
       vendorId: bill.vendorId,

@@ -122,9 +122,16 @@ export const findLoanByVendorId = (userId: string, vendorId: string): Promise<Re
 
 /**
  * Update loan principal (e.g., after a payment).
+ * If a transaction client is provided, the operation will be part of that transaction.
  */
-export const updateLoanPrincipal = (userId: string, loanId: string, newPrincipal: number): Promise<Result<Loan>> => {
-  const action = prisma.loan.update({
+export const updateLoanPrincipal = (
+  userId: string,
+  loanId: string,
+  newPrincipal: number,
+  tx?: Prisma.TransactionClient
+): Promise<Result<Loan>> => {
+  const client = tx ?? prisma
+  const action = client.loan.update({
     where: { id: loanId, userId },
     data: { principal: newPrincipal },
   })

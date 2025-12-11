@@ -4,11 +4,13 @@ import { findVendorById } from '../infrastructure/vendorRepo'
 import { createJournalEntry } from '@/bounded-contexts/ledger/infrastructure/journalEntryRepo'
 import { findAccountByCode } from '@/bounded-contexts/ledger/infrastructure/accountRepo'
 import { Result, Success, Failure } from '@/common/types/result'
-import { DomainFailure } from '@/common/types/errors'
+import { DomainFailure, AppError } from '@/common/types/errors'
 import { PurchasingDomainSubtype } from '../domain/errors'
 import { JournalLineSide, Account } from '@/bounded-contexts/ledger/domain/ledger'
 import { DEFAULT_ACCOUNT_CODES } from '@/bounded-contexts/ledger/domain/defaultAccounts'
 import { fromNullable as optionFromNullable, getOrElse as optionGetOrElse } from '@/common/types/option'
+import { prisma } from '@/common/infrastructure/db'
+import { Prisma } from '@/prisma/client'
 
 /**
  * Workflow input: raw data from command (API request).
@@ -99,49 +101,70 @@ export const recordCashExpenseWorkflow = async (command: RecordCashExpenseComman
   }
   const expenseAccountValue = expenseAccountResult.value
 
-  // Step 4: Create journal entry
+  // Step 4 & 5: Create journal entry and cash expense within a transaction
   const description = optionGetOrElse(`Cash expense ${command.expenseCategory}`)(optionFromNullable(command.description))
-  const journalEntryResult = await createJournalEntry({
-    userId: command.userId,
-    entryNumber: `CASH-EXP-${Date.now()}`,
-    description,
-    date: new Date(command.date),
-    lines: [
-      {
-        accountId: expenseAccountValue.id!,
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // Create journal entry
+      const journalEntryResult = await createJournalEntry({
+        userId: command.userId,
+        entryNumber: `CASH-EXP-${Date.now()}`,
+        description,
+        date: new Date(command.date),
+        lines: [
+          {
+            accountId: expenseAccountValue.id!,
+            amount: command.amount,
+            side: 'Debit' as JournalLineSide, // Expense increases with debit
+          },
+          {
+            accountId: cashAccountValue.id!,
+            amount: command.amount,
+            side: 'Credit' as JournalLineSide, // Cash decreases with credit
+          },
+        ],
+      }, tx)
+
+      if (!journalEntryResult.isSuccess) {
+        // Throw the error to rollback transaction
+        throw journalEntryResult.error
+      }
+
+      const journalEntry = journalEntryResult.value
+
+      // Create cash expense record
+      const expenseToCreate: Omit<CashExpense, 'id' | 'createdAt' | 'updatedAt'> = {
+        userId: command.userId,
+        vendorId: command.vendorId,
         amount: command.amount,
-        side: 'Debit' as JournalLineSide, // Expense increases with debit
-      },
-      {
-        accountId: cashAccountValue.id!,
-        amount: command.amount,
-        side: 'Credit' as JournalLineSide, // Cash decreases with credit
-      },
-    ],
-  })
+        date: new Date(command.date),
+        expenseCategory: command.expenseCategory,
+        description: command.description,
+        journalEntryId: journalEntry.id!,
+      }
 
-  if (!journalEntryResult.isSuccess) {
-    return journalEntryResult
+      const expenseResult = await createCashExpense(expenseToCreate, tx)
+      if (!expenseResult.isSuccess) {
+        throw expenseResult.error
+      }
+
+      return expenseResult.value
+    })
+
+    return Success(result)
+  } catch (error) {
+    // error is either an AppError (from thrown Result.error) or an unknown error
+    if (error instanceof Error && 'type' in error && 'subtype' in error) {
+      // It's an AppError
+      return Failure(error as AppError)
+    }
+    // unknown error
+    return Failure(
+      DomainFailure(
+        'TransactionFailed' as PurchasingDomainSubtype,
+        `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    )
   }
-
-  const journalEntry = journalEntryResult.value
-
-  // Step 5: Create cash expense record
-  const expenseToCreate: Omit<CashExpense, 'id' | 'createdAt' | 'updatedAt'> = {
-    userId: command.userId,
-    vendorId: command.vendorId,
-    amount: command.amount,
-    date: new Date(command.date),
-    expenseCategory: command.expenseCategory,
-    description: command.description,
-    journalEntryId: journalEntry.id!,
-  }
-
-  const expenseResult = await createCashExpense(expenseToCreate)
-  if (!expenseResult.isSuccess) {
-    // TODO: Rollback journal entry? For now, leave orphaned.
-    return expenseResult
-  }
-
-  return expenseResult
 }

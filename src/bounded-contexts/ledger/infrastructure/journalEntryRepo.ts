@@ -64,29 +64,30 @@ const toDomainJournalEntry = (prismaEntry: any): JournalEntry => ({
 
 /**
  * Create a new journal entry with its lines in the database.
- * Uses a transaction to ensure atomicity.
+ * Uses a transaction to ensure atomicity unless a transaction client is provided.
  */
-export const createJournalEntry = (entry: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>): Promise<Result<JournalEntry>> => {
-  const action = prisma.$transaction(async (tx) => {
-    const createdEntry = await tx.journalEntry.create({
-      data: {
-        userId: entry.userId,
-        entryNumber: entry.entryNumber,
-        description: entry.description,
-        date: entry.date,
-        lines: {
-          create: entry.lines.map(line => ({
-            accountId: line.accountId,
-            amount: line.amount,
-            side: line.side,
-          })),
-        },
+export const createJournalEntry = (
+  entry: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>,
+  tx?: Prisma.TransactionClient
+): Promise<Result<JournalEntry>> => {
+  const client = tx ?? prisma
+  const action = client.journalEntry.create({
+    data: {
+      userId: entry.userId,
+      entryNumber: entry.entryNumber,
+      description: entry.description,
+      date: entry.date,
+      lines: {
+        create: entry.lines.map(line => ({
+          accountId: line.accountId,
+          amount: line.amount,
+          side: line.side,
+        })),
       },
-      include: {
-        lines: true,
-      },
-    })
-    return createdEntry
+    },
+    include: {
+      lines: true,
+    },
   })
   return safeDbCall(action).then(result =>
     result.isSuccess

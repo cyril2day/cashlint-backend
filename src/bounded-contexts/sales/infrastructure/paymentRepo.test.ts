@@ -9,11 +9,19 @@ describe('Sales Context: Payment Repository (Infrastructure)', () => {
   })
 
   beforeEach(async () => {
+    // Delete in order of foreign key dependencies
+    await prisma.loanPayment.deleteMany()
+    await prisma.loan.deleteMany()
+    await prisma.cashExpense.deleteMany()
+    await prisma.vendorBill.deleteMany()
+    await prisma.vendor.deleteMany()
     await prisma.payment.deleteMany()
     await prisma.cashSale.deleteMany()
     await prisma.customerDeposit.deleteMany()
     await prisma.salesInvoice.deleteMany()
     await prisma.customer.deleteMany()
+    await prisma.period.deleteMany()
+    await prisma.session.deleteMany()
     await prisma.journalLine.deleteMany()
     await prisma.journalEntry.deleteMany()
     await prisma.account.deleteMany()

@@ -9,6 +9,8 @@ import { PurchasingDomainSubtype } from '../domain/errors'
 import { JournalLineSide, Account } from '@/bounded-contexts/ledger/domain/ledger'
 import { DEFAULT_ACCOUNT_CODES } from '@/bounded-contexts/ledger/domain/defaultAccounts'
 import { fromNullable as optionFromNullable, getOrElse as optionGetOrElse } from '@/common/types/option'
+import { prisma } from '@/common/infrastructure/db'
+import { Prisma } from '@/prisma/client'
 
 /**
  * Workflow input: raw data from command (API request).
@@ -124,58 +126,82 @@ export const recordVendorBillWorkflow = async (command: RecordVendorBillCommand)
   const apAccountValue = apAccount.value as Account
   const expenseAccountValue = expenseAccount.value as Account
 
-  // Step 5: Create journal entry
   const description = optionGetOrElse(`Vendor bill ${command.billNumber}`)(optionFromNullable(command.description))
-  const journalEntryResult = await createJournalEntry({
-    userId: command.userId,
-    entryNumber: `BILL-${command.billNumber}`,
-    description,
-    date: new Date(command.date),
-    lines: [
-      {
-        accountId: expenseAccountValue.id!,
+
+  try {
+    const bill = await prisma.$transaction(async (tx) => {
+      // Step 5: Create journal entry within transaction
+      const journalEntryResult = await createJournalEntry(
+        {
+          userId: command.userId,
+          entryNumber: `BILL-${command.billNumber}`,
+          description,
+          date: new Date(command.date),
+          lines: [
+            {
+              accountId: expenseAccountValue.id!,
+              amount: command.amount,
+              side: 'Debit' as JournalLineSide,
+            },
+            {
+              accountId: apAccountValue.id!,
+              amount: command.amount,
+              side: 'Credit' as JournalLineSide,
+            },
+          ],
+        },
+        tx
+      )
+      if (!journalEntryResult.isSuccess) {
+        throw journalEntryResult.error
+      }
+      const journalEntry = journalEntryResult.value
+
+      // Step 6: Create vendor bill within transaction
+      const billToCreate: Omit<VendorBill, 'id' | 'createdAt' | 'updatedAt'> = {
+        userId: command.userId,
+        vendorId: command.vendorId,
+        billNumber: command.billNumber,
         amount: command.amount,
-        side: 'Debit' as JournalLineSide,
-      },
-      {
-        accountId: apAccountValue.id!,
-        amount: command.amount,
-        side: 'Credit' as JournalLineSide,
-      },
-    ],
-  })
+        date: new Date(command.date),
+        dueDate: command.dueDate ? new Date(command.dueDate) : undefined,
+        description: command.description,
+        status: 'Recorded' as VendorBillStatus,
+        journalEntryId: journalEntry.id!,
+      }
 
-  if (!journalEntryResult.isSuccess) {
-    return journalEntryResult
+      const billResult = await createVendorBill(billToCreate, tx)
+      if (!billResult.isSuccess) {
+        throw billResult.error
+      }
+      const bill = billResult.value
+
+      // Step 7: Update vendor balance within transaction
+      const updateBalanceResult = await updateVendorBalance(command.userId, command.vendorId, command.amount, tx)
+      if (!updateBalanceResult.isSuccess) {
+        throw updateBalanceResult.error
+      }
+
+      return bill
+    })
+    return Success(bill)
+  } catch (error) {
+    // The transaction has rolled back; convert error to a Result failure
+    if (
+      error &&
+      typeof error === 'object' &&
+      'type' in error &&
+      (error.type === 'DomainFailure' || error.type === 'InfrastructureFailure')
+    ) {
+      return Failure(error as any)
+    }
+    // Unknown error (e.g., Prisma error)
+    const message = error instanceof Error ? error.message : String(error)
+    return Failure(
+      DomainFailure(
+        'TransactionFailed' as PurchasingDomainSubtype,
+        `Transaction failed: ${message}`
+      )
+    )
   }
-
-  const journalEntry = journalEntryResult.value
-
-  // Step 6: Create vendor bill
-  const billToCreate: Omit<VendorBill, 'id' | 'createdAt' | 'updatedAt'> = {
-    userId: command.userId,
-    vendorId: command.vendorId,
-    billNumber: command.billNumber,
-    amount: command.amount,
-    date: new Date(command.date),
-    dueDate: command.dueDate ? new Date(command.dueDate) : undefined,
-    description: command.description,
-    status: 'Recorded' as VendorBillStatus,
-    journalEntryId: journalEntry.id!,
-  }
-
-  const billResult = await createVendorBill(billToCreate)
-  if (!billResult.isSuccess) {
-    // TODO: Rollback journal entry? For simplicity, we leave it (orphaned).
-    return billResult
-  }
-
-  // Step 7: Update vendor balance (increase Accounts Payable)
-  const updateBalanceResult = await updateVendorBalance(command.userId, command.vendorId, command.amount)
-  if (!updateBalanceResult.isSuccess) {
-    // If this fails, we have an inconsistent state. Log and continue for now.
-    console.error('Failed to update vendor balance', updateBalanceResult.error)
-  }
-
-  return billResult
 }

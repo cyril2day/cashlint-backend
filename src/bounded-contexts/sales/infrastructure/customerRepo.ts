@@ -104,9 +104,16 @@ export const listCustomers = (userId: string): Promise<Result<Customer[]>> => {
 /**
  * Update customer balance by adding an amount (positive or negative).
  * This is a specialized function for updating the subsidiary balance.
+ * If a transaction client is provided, the operation will be part of that transaction.
  */
-export const updateCustomerBalance = (userId: string, customerId: string, amountDelta: number): Promise<Result<Customer>> => {
-  const action = prisma.customer.update({
+export const updateCustomerBalance = (
+  userId: string,
+  customerId: string,
+  amountDelta: number,
+  tx?: Prisma.TransactionClient
+): Promise<Result<Customer>> => {
+  const client = tx ?? prisma
+  const action = client.customer.update({
     where: { id: customerId, userId },
     data: {
       balance: { increment: amountDelta },
