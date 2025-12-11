@@ -53,6 +53,11 @@ enum VendorBillStatus {
   Paid
 }
 
+enum PeriodStatus {
+  Open
+  Closed
+}
+
 model User {
   id        String    @id @default(uuid())
   username  String    @unique
@@ -68,6 +73,7 @@ model User {
   vendorBills VendorBill[]
   loans     Loan[]
   cashExpenses CashExpense[]
+  periods   Period[]
 }
 
 model Session {
@@ -97,7 +103,7 @@ model JournalEntry {
   description String
   date        DateTime
   createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  updatedAt    DateTime      @updatedAt
   user        User          @relation(fields: [userId], references: [id])
   lines       JournalLine[]
   salesInvoice SalesInvoice? // reverse relation
@@ -272,4 +278,19 @@ model CashExpense {
   user           User           @relation(fields: [userId], references: [id])
   vendor         Vendor         @relation(fields: [vendorId], references: [id])
   journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+}
+
+model Period {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  status    PeriodStatus
+  closedAt  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, name])
 }

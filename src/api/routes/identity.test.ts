@@ -11,6 +11,7 @@ describe('Identity Context: API Routes (Integration)', () => {
   // Clean up the database before every test to ensure isolation
   // Must delete in correct order to respect foreign key constraints
   beforeEach(async () => {
+    await prisma.period.deleteMany()
     await prisma.payment.deleteMany()
     await prisma.loanPayment.deleteMany()
     await prisma.cashExpense.deleteMany()

@@ -9,15 +9,30 @@ describe('Sales Context: Customer Repository (Infrastructure)', () => {
 
   // Clean up before each test
   beforeEach(async () => {
-    // Delete sales-related tables in correct order (due to foreign keys)
+    // Delete in correct order, respecting foreign keys
+    // 0. Period (depends on User, but must be deleted before User due to foreign key)
+    await prisma.period.deleteMany()
+    // 1. Child tables of JournalEntry (that are not already in sales)
     await prisma.payment.deleteMany()
+    await prisma.loanPayment.deleteMany()
+    await prisma.cashExpense.deleteMany()
+    await prisma.vendorBill.deleteMany()
+    await prisma.salesInvoice.deleteMany()
     await prisma.cashSale.deleteMany()
     await prisma.customerDeposit.deleteMany()
-    await prisma.salesInvoice.deleteMany()
+    // 2. Other child tables
+    await prisma.loan.deleteMany()
+    await prisma.vendor.deleteMany()
     await prisma.customer.deleteMany()
+    // 3. JournalLine (depends on JournalEntry and Account)
     await prisma.journalLine.deleteMany()
+    // 4. JournalEntry (depends on User)
     await prisma.journalEntry.deleteMany()
+    // 5. Account (depends on User)
     await prisma.account.deleteMany()
+    // 6. Session (depends on User)
+    await prisma.session.deleteMany()
+    // 7. User
     await prisma.user.deleteMany()
   })
 

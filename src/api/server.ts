@@ -3,6 +3,7 @@ import { identityRoutes } from './routes/identity'
 import { ledgerRoutes } from './routes/ledger'
 import { salesRoutes } from './routes/sales'
 import { purchasingRoutes } from './routes/purchasing'
+import { periodCloseRoutes } from './routes/period-close'
 
 const app = express()
 app.use(express.json())
@@ -12,6 +13,7 @@ app.use('/api', identityRoutes)
 app.use('/api/ledger', ledgerRoutes)
 app.use('/api/sales', salesRoutes)
 app.use('/api/purchasing', purchasingRoutes)
+app.use('/api/period-close', periodCloseRoutes)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' })
