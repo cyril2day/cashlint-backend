@@ -20,6 +20,9 @@ export const mapErrorToResponse = (error: AppError): { status: number; body: any
         case 'BillNotFound':
         case 'LoanNotFound':
         case 'PeriodNotFound':
+        case 'MissingCapitalAccount':
+        case 'MissingDrawingAccount':
+        case 'CashAccountNotFound':
           return {
             status: 404, // Not Found
             body: { error }
