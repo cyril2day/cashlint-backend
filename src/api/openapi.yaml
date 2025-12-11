@@ -607,6 +607,46 @@ components:
         - status
         - createdAt
 
+    CreatePeriodRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: User ID (must match authenticated user)
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          description: Period name (1‑100 characters)
+          example: "January 2025"
+        startDate:
+          type: string
+          format: date-time
+          description: Period start date (ISO 8601)
+          example: "2025-01-01T00:00:00Z"
+        endDate:
+          type: string
+          format: date-time
+          description: Period end date (must be after startDate)
+          example: "2025-01-31T23:59:59Z"
+      required:
+        - userId
+        - name
+        - startDate
+        - endDate
+
+    CreatePeriodResponse:
+      type: object
+      properties:
+        period:
+          $ref: '#/components/schemas/Period'
+        message:
+          type: string
+          example: "Period created successfully"
+      required:
+        - period
+        - message
+
     # Reporting Context
     FinancialStatement:
       type: object
