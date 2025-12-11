@@ -53,9 +53,9 @@ src/
 │   │   └── infrastructure/      # User repository, session handling
 │   ├── ledger/                  # Ledger context
 │   ├── sales/                   # Sales context
-│   ├── purchasing/              # Purchasing context (to be implemented)
-│   ├── period-close/            # PeriodClose context (to be implemented)
-│   └── reporting/               # Reporting context (to be implemented)
+│   ├── purchasing/              # Purchasing context
+│   ├── period-close/            # PeriodClose context
+│   └── reporting/               # Reporting context
 ├── common/                      # Cross‑cutting concerns
 │   ├── types/                   # Result<T>, AppError, etc.
 │   └── infrastructure/          # Database client, logger
