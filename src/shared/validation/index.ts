@@ -1,4 +1,3 @@
-import * as R from 'ramda'
 import { Result, Success, Failure } from '@/common/types/result'
 import { DomainFailure, AppError } from '@/common/types/errors'
 import { fromNullable, getOrElse } from '@/common/types/option'

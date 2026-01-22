@@ -1,4 +1,3 @@
-import * as R from 'ramda'
 import { Result, Success, Failure, andThen } from '@/common/types/result'
 import { DomainFailure } from '@/common/types/errors'
 import { PurchasingDomainSubtype } from './errors'

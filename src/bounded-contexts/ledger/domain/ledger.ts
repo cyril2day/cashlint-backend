@@ -1,7 +1,7 @@
-import * as R from 'ramda'
 import { Result, Success, Failure, andThen } from '@/common/types/result'
 import { DomainFailure } from '@/common/types/errors'
 import { LedgerDomainSubtype } from './errors'
+import { pipe, filter, map, sum } from '@/shared/fp-utils'
 import {
   validateStringLength,
   validatePositiveMoneyWith,
@@ -116,16 +116,16 @@ export const validateDescription = validateStringLength(1, 500, 'InvalidJournalE
  * Validate that the journal entry is balanced (total debits = total credits).
  */
 export const validateJournalEntryBalanced = (lines: JournalLine[]): Result<JournalLine[]> => {
-  const totalDebits = R.pipe(
-    R.filter((line: JournalLine) => line.side === 'Debit'),
-    R.map((line: JournalLine) => line.amount),
-    R.sum
+  const totalDebits = pipe(
+    filter((line: JournalLine) => line.side === 'Debit'),
+    map((line: JournalLine) => line.amount),
+    sum
   )(lines)
 
-  const totalCredits = R.pipe(
-    R.filter((line: JournalLine) => line.side === 'Credit'),
-    R.map((line: JournalLine) => line.amount),
-    R.sum
+  const totalCredits = pipe(
+    filter((line: JournalLine) => line.side === 'Credit'),
+    map((line: JournalLine) => line.amount),
+    sum
   )(lines)
 
   if (Math.abs(totalDebits - totalCredits) > 0.001) {

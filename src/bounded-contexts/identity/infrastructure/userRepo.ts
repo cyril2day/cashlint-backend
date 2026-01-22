@@ -21,9 +21,22 @@ const safeDbCall = async <T>(promise: Promise<T>): Promise<Result<T>> => {
 
 
 export const createUser = (username: string): Promise<Result<User>> => {
-  const action = prisma.user.create({ 
-    data: { username } 
+  const action = prisma.user.create({
+    data: { username }
   })
 
   return safeDbCall(action)
+}
+
+export const findUserByUsername = (username: string): Promise<Result<User>> => {
+  const action = prisma.user.findUnique({
+    where: { username }
+  })
+  return safeDbCall(action).then(result => {
+    if (!result.isSuccess) return result
+    if (result.value === null) {
+      return Failure(InfrastructureFailure('UserNotFound', 'User not found'))
+    }
+    return Success(result.value)
+  })
 }

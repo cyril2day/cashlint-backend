@@ -1,4 +1,3 @@
-import * as R from 'ramda'
 import { Result, Success, Failure } from '@/common/types/result'
 import { DomainFailure } from '@/common/types/errors'
 import { fromNullable, getOrElse } from '@/common/types/option'
@@ -23,7 +22,7 @@ export const validateUsername = (input: string): Result<string> => {
   const safeInput = getOrElse('')(fromNullable(input))
   
   // Functional composition for normalization
-  const normalized = R.pipe(R.trim, R.toLower)(safeInput)
+  const normalized = safeInput.trim().toLowerCase()
 
   // Use shared validators for length and pattern
   const lengthValidator = validateStringLength(minimumUsernameLength, Infinity, 'InvalidUsername')

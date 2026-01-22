@@ -1,5 +1,7 @@
-import * as R from 'ramda'
-import { Result, Success, Failure, andThen } from '@/common/types/result'
+import { map, sum, filter } from '@/shared/fp-utils'
+import { equals, gt, ifElse, not } from 'pristine-fp'
+import { signedAmount, isAccountType, filterByAccountType, adjustedBalance } from './reporting-helpers'
+import { Result, Success, Failure, andThen, isFailure } from '@/common/types/result'
 import { DomainFailure } from '@/common/types/errors'
 import { ReportingDomainSubtype } from './errors'
 import {
@@ -113,16 +115,9 @@ export const calculateAccountBalance = (
   lines: JournalLine[]
 ): Money => {
   const { normalBalance } = account
-  let balance = 0
-  for (const line of lines) {
-    if (line.accountId !== account.id) continue
-    if (line.side === 'Debit') {
-      balance += normalBalance === 'Debit' ? line.amount : -line.amount
-    } else {
-      balance += normalBalance === 'Credit' ? line.amount : -line.amount
-    }
-  }
-  return balance
+  const isLineForAccount = (line: JournalLine) => equals(line.accountId)(account.id)
+  const signed = (line: JournalLine) => signedAmount(line.side, normalBalance, line.amount)
+  return sum(map(signed)(filter(isLineForAccount)(lines)))
 }
 
 /**
@@ -133,8 +128,8 @@ export const calculateNetIncome = (
   revenueAccounts: AccountWithBalance[],
   expenseAccounts: AccountWithBalance[]
 ): Money => {
-  const totalRevenue = R.sum(R.map((acc) => acc.balance, revenueAccounts))
-  const totalExpense = R.sum(R.map((acc) => acc.balance, expenseAccounts))
+  const totalRevenue = sum(map((acc: AccountWithBalance) => acc.balance)(revenueAccounts))
+  const totalExpense = sum(map((acc: AccountWithBalance) => acc.balance)(expenseAccounts))
   return totalRevenue - totalExpense
 }
 
@@ -144,17 +139,17 @@ export const calculateNetIncome = (
 export const validateDateRange = (
   startDate: Date,
   endDate: Date
-): Result<{ startDate: Date; endDate: Date }> => {
-  if (startDate > endDate) {
-    return Failure(
+): Result<{ startDate: Date; endDate: Date }> =>
+  ifElse(
+    () => gt(startDate.getTime())(endDate.getTime()),
+    () => Failure(
       DomainFailure(
         'InvalidDateRange' as ReportingDomainSubtype,
         `Start date (${startDate.toISOString()}) must be on or before end date (${endDate.toISOString()}).`
       )
-    )
-  }
-  return Success({ startDate, endDate })
-}
+    ),
+    () => Success({ startDate, endDate })
+  )
 
 /**
  * Build an income statement from accounts with balances for a given period.
@@ -165,10 +160,10 @@ export const buildIncomeStatement = (
   endDate: Date
 ): Result<IncomeStatement> => {
   const dateRangeResult = validateDateRange(startDate, endDate)
-  if (!dateRangeResult.isSuccess) return dateRangeResult
+  if (isFailure(dateRangeResult)) return dateRangeResult
 
-  const revenues = accounts.filter((acc) => acc.type === 'Revenue')
-  const expenses = accounts.filter((acc) => acc.type === 'Expense')
+  const revenues = filterByAccountType('Revenue')(accounts)
+  const expenses = filterByAccountType('Expense')(accounts)
 
   const revenueLines: StatementLine[] = revenues
     .map((acc) => ({
@@ -176,17 +171,17 @@ export const buildIncomeStatement = (
       accountName: acc.name,
       amount: acc.balance,
     }))
-    .filter((line) => line.amount !== 0)
+    .filter((line) => not(equals(line.amount)(0)))
   const expenseLines: StatementLine[] = expenses
     .map((acc) => ({
       accountCode: acc.code,
       accountName: acc.name,
       amount: acc.balance,
     }))
-    .filter((line) => line.amount !== 0)
+    .filter((line) => not(equals(line.amount)(0)))
 
-  const revenueTotal = R.sum(R.map((line) => line.amount, revenueLines))
-  const expenseTotal = R.sum(R.map((line) => line.amount, expenseLines))
+  const revenueTotal = sum(map((line: StatementLine) => line.amount)(revenueLines))
+  const expenseTotal = sum(map((line: StatementLine) => line.amount)(expenseLines))
   const netIncome = revenueTotal - expenseTotal
 
   return Success({
@@ -211,17 +206,17 @@ export const buildBalanceSheet = (
   accounts: AccountWithBalance[],
   asOfDate: Date
 ): Result<BalanceSheet> => {
-  const assets = accounts.filter((acc) => acc.type === 'Asset')
-  const liabilities = accounts.filter((acc) => acc.type === 'Liability')
-  const equityAccounts = accounts.filter((acc) => acc.type === 'Equity')
-  const revenueAccounts = accounts.filter((acc) => acc.type === 'Revenue')
-  const expenseAccounts = accounts.filter((acc) => acc.type === 'Expense')
+  const assets = filterByAccountType('Asset')(accounts)
+  const liabilities = filterByAccountType('Liability')(accounts)
+  const equityAccounts = filterByAccountType('Equity')(accounts)
+  const revenueAccounts = filterByAccountType('Revenue')(accounts)
+  const expenseAccounts = filterByAccountType('Expense')(accounts)
 
   // Asset lines with contra‑asset adjustment
   const assetLines: StatementLine[] = assets.map((acc) => ({
     accountCode: acc.code,
     accountName: acc.name,
-    amount: isContraAccount(acc) ? -acc.balance : acc.balance,
+    amount: adjustedBalance(acc),
   }))
   // Liability lines (no contra‑liability in v1)
   const liabilityLines: StatementLine[] = liabilities.map((acc) => ({
@@ -233,7 +228,7 @@ export const buildBalanceSheet = (
   const equityAccountLines: StatementLine[] = equityAccounts.map((acc) => ({
     accountCode: acc.code,
     accountName: acc.name,
-    amount: acc.normalBalance === 'Debit' ? -acc.balance : acc.balance,
+    amount: adjustedBalance(acc),
   }))
   // Retained earnings line (net income)
   const netIncome = calculateNetIncome(revenueAccounts, expenseAccounts)
@@ -244,30 +239,30 @@ export const buildBalanceSheet = (
   }
   const equityLines = [...equityAccountLines, retainedEarningsLine]
 
-  const assetTotal = R.sum(R.map((line) => line.amount, assetLines))
-  const liabilityTotal = R.sum(R.map((line) => line.amount, liabilityLines))
-  const equityTotal = R.sum(R.map((line) => line.amount, equityLines))
+  const assetTotal = sum(map((line: StatementLine) => line.amount)(assetLines))
+  const liabilityTotal = sum(map((line: StatementLine) => line.amount)(liabilityLines))
+  const equityTotal = sum(map((line: StatementLine) => line.amount)(equityLines))
 
   // Accounting equation must hold (within 0.01 due to rounding)
   const diff = Math.abs(assetTotal - (liabilityTotal + equityTotal))
-  if (diff > 0.01) {
-    return Failure(
+  return ifElse(
+    () => gt(diff)(0.01),
+    () => Failure(
       DomainFailure(
         'AccountingEquationViolation' as ReportingDomainSubtype,
         `Balance sheet equation violated: assets (${assetTotal}) != liabilities (${liabilityTotal}) + equity (${equityTotal}) (difference: ${diff}).`
       )
-    )
-  }
-
-  return Success({
-    asOfDate,
-    assets: assetLines,
-    assetTotal,
-    liabilities: liabilityLines,
-    liabilityTotal,
-    equity: equityLines,
-    equityTotal,
-  })
+    ),
+    () => Success({
+      asOfDate,
+      assets: assetLines,
+      assetTotal,
+      liabilities: liabilityLines,
+      liabilityTotal,
+      equity: equityLines,
+      equityTotal,
+    })
+  )
 }
 
 /**
@@ -308,7 +303,7 @@ export const buildStatementOfCashFlows = (
   endDate: Date
 ): Result<StatementOfCashFlows> => {
   const dateRangeResult = validateDateRange(startDate, endDate)
-  if (!dateRangeResult.isSuccess) return dateRangeResult
+  if (isFailure(dateRangeResult)) return dateRangeResult
 
   // We need to classify each line. For now, we'll assume we have additional context (counterpart accounts).
   // However, the function signature only provides cash lines; we cannot classify without knowing the other side.
