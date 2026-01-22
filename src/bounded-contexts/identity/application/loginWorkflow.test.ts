@@ -34,7 +34,7 @@ describe('Identity Context: Login Workflow (Integration)', () => {
   })
 
   it('should successfully login with valid username', async () => {
-    expect.assertions(6)
+    expect.assertions(7)
 
     const username = 'valid_user_123'
     // Create user first
@@ -50,19 +50,20 @@ describe('Identity Context: Login Workflow (Integration)', () => {
     expect(result.isSuccess).toBe(true)
 
     if (result.isSuccess) {
-      const session = result.value
-      expect(session.userId).toBeDefined()
-      expect(session.id).toBeDefined()
-      expect(session.expiresAt).toBeInstanceOf(Date)
-      expect(session.expiresAt.getTime()).toBeGreaterThan(Date.now())
+      const sessionId = result.value // returns session ID string
+      expect(sessionId).toBeDefined()
+      expect(typeof sessionId).toBe('string')
       // Verify session is stored in DB
-      const dbSession = await prisma.session.findUnique({ where: { id: session.id } })
+      const dbSession = await prisma.session.findUnique({ where: { id: sessionId } })
       expect(dbSession).not.toBeNull()
+      expect(dbSession!.userId).toBeDefined()
+      expect(dbSession!.expiresAt).toBeInstanceOf(Date)
+      expect(dbSession!.expiresAt.getTime()).toBeGreaterThan(Date.now())
     }
   })
 
   it('should normalize uppercase username to lowercase', async () => {
-    expect.assertions(2)
+    expect.assertions(3)
 
     const inputUsername = 'Valid_User_Upper'
     const expectedUsername = 'valid_user_upper'
@@ -77,9 +78,12 @@ describe('Identity Context: Login Workflow (Integration)', () => {
 
     expect(result.isSuccess).toBe(true)
     if (result.isSuccess) {
-      // The session's userId is the same as user's id (not username), but we can verify the user was found
+      const sessionId = result.value // returns session ID string
+      expect(sessionId).toBeDefined()
+      // Verify session exists and belongs to the correct user
+      const dbSession = await prisma.session.findUnique({ where: { id: sessionId } })
       const user = await prisma.user.findUnique({ where: { username: expectedUsername } })
-      expect(result.value.userId).toBe(user!.id)
+      expect(dbSession!.userId).toBe(user!.id)
     }
   })
 
