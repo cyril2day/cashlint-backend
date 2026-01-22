@@ -69,6 +69,64 @@ components:
         - users
         - count
 
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique session identifier
+        userId:
+          type: string
+          description: ID of the user who owns this session
+        expiresAt:
+          type: string
+          format: date-time
+          description: When the session expires (idle timeout)
+        createdAt:
+          type: string
+          format: date-time
+          description: When the session was created
+      required:
+        - id
+        - userId
+        - expiresAt
+        - createdAt
+
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Username to login (will be normalized to lowercase)
+          example: "valid_user_123"
+      required:
+        - username
+
+    LoginResponse:
+      type: object
+      properties:
+        session:
+          $ref: '#/components/schemas/Session'
+        user:
+          $ref: '#/components/schemas/User'
+        message:
+          type: string
+          example: "Login successful"
+      required:
+        - session
+        - user
+        - message
+
+    LogoutResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Logout successful"
+      required:
+        - message
+
     # Ledger Context
     Account:
       type: object
@@ -1095,6 +1153,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+
+  /api/login:
+    post:
+      summary: Login with username
+      description: Create a session for the user with the given username. If the username does not exist, returns an error. On success, sets a cookie named "session" with the session ID.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Invalid username (domain validation failed) or missing required field
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Username not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/logout:
+    post:
+      summary: Logout (invalidate session)
+      description: Invalidate the current session by clearing the session cookie. Requires a valid session cookie.
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+        '401':
+          description: No valid session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   # Ledger Context
   /api/ledger/accounts:
