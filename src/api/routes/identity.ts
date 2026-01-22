@@ -31,15 +31,16 @@ router.post('/users', createHandler(
 // ------------------------------
 // Login route
 // ------------------------------
-const respondWithTokenAndCookie = (res: any, sessionId: string) => {
-  res.cookie('sessionId', sessionId, {
+const respondWithTokenAndCookie = (res: any, loginResult: { token: string, userId: string }) => {
+  res.cookie('sessionId', loginResult.token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 60 * 60 * 1000, // 1 hour
   })
   return res.status(200).json({
-    token: sessionId,
+    token: loginResult.token,
+    userId: loginResult.userId,
     message: 'Login successful'
   })
 }

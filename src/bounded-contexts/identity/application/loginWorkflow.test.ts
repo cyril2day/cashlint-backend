@@ -34,7 +34,7 @@ describe('Identity Context: Login Workflow (Integration)', () => {
   })
 
   it('should successfully login with valid username', async () => {
-    expect.assertions(7)
+    expect.assertions(9)
 
     const username = 'valid_user_123'
     // Create user first
@@ -50,13 +50,15 @@ describe('Identity Context: Login Workflow (Integration)', () => {
     expect(result.isSuccess).toBe(true)
 
     if (result.isSuccess) {
-      const sessionId = result.value // returns session ID string
-      expect(sessionId).toBeDefined()
-      expect(typeof sessionId).toBe('string')
+      const { token, userId } = result.value // returns { token, userId }
+      expect(token).toBeDefined()
+      expect(typeof token).toBe('string')
+      expect(userId).toBeDefined()
+      expect(typeof userId).toBe('string')
       // Verify session is stored in DB
-      const dbSession = await prisma.session.findUnique({ where: { id: sessionId } })
+      const dbSession = await prisma.session.findUnique({ where: { id: token } })
       expect(dbSession).not.toBeNull()
-      expect(dbSession!.userId).toBeDefined()
+      expect(dbSession!.userId).toBe(userId)
       expect(dbSession!.expiresAt).toBeInstanceOf(Date)
       expect(dbSession!.expiresAt.getTime()).toBeGreaterThan(Date.now())
     }
@@ -78,10 +80,10 @@ describe('Identity Context: Login Workflow (Integration)', () => {
 
     expect(result.isSuccess).toBe(true)
     if (result.isSuccess) {
-      const sessionId = result.value // returns session ID string
-      expect(sessionId).toBeDefined()
+      const { token } = result.value // returns { token, userId }
+      expect(token).toBeDefined()
       // Verify session exists and belongs to the correct user
-      const dbSession = await prisma.session.findUnique({ where: { id: sessionId } })
+      const dbSession = await prisma.session.findUnique({ where: { id: token } })
       const user = await prisma.user.findUnique({ where: { username: expectedUsername } })
       expect(dbSession!.userId).toBe(user!.id)
     }

@@ -26,6 +26,9 @@ export const loginWorkflow = async (username: string) => {
   // Chain with session creation (async action) using the user's id
   const sessionResult = await andThenAsync((user: User) => createSession(user.id))(userResult)
 
-  // Extract the token (session ID) from the session
-  return map((session: Session) => session.id)(sessionResult)
+  // Extract the token (session ID) and userId from the session
+  return map((session: Session) => ({
+    token: session.id,
+    userId: session.userId,
+  }))(sessionResult)
 }
