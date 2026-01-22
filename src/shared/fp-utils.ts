@@ -1,6 +1,6 @@
 import { compose, curry2 } from 'pristine-fp'
 import { map as _map, filter as _filter, sum as _sum } from 'pristine-fp'
-import { equals, truthy, existy, safeProp, not, defaultTo, when, unless, gt, ifElse } from 'pristine-fp'
+import { equals, truthy, safeProp, when, ifElse } from 'pristine-fp'
 import { Result, Success, Failure } from '@/common/types/result'
 import { ApplicationFailure } from '@/common/types/errors'
 
@@ -44,6 +44,33 @@ export const allOf = <T>(...predicates: Array<(x: T) => boolean>) => (value: T):
  */
 export const anyOf = <T>(...predicates: Array<(x: T) => boolean>) => (value: T): boolean =>
   predicates.some(pred => pred(value))
+
+/**
+ * Type guard that narrows `T | null | undefined` to `T` when the value is truthy.
+ */
+const isTruthy = <T>(x: T | null | undefined): x is Exclude<T, null | undefined> => truthy(x)
+
+/**
+ * Returns the first truthy value from a list, otherwise undefined.
+ */
+export const firstTruthy = <T>(...values: Array<T | null | undefined>): T | undefined =>
+  values.find(isTruthy)
+
+/**
+ * Returns a tuple of two values if both are truthy, otherwise undefined.
+ */
+export const bothTruthy = <A, B>(
+  a: A | null | undefined,
+  b: B | null | undefined
+): [A, B] | undefined =>
+  when(truthy(a), () => when(truthy(b), () => [a as A, b as B]))
+
+/**
+ * Returns a function that applies `f` only when the predicate `p` is true for the input.
+ * Useful for building validation pipelines.
+ */
+export const whenPass = <T, U>(p: (x: T) => boolean, f: (x: T) => U) =>
+  (x: T): U | undefined => when(p(x), () => f(x))
 
 /**
  * Predicates

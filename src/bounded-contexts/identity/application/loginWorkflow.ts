@@ -2,17 +2,18 @@ import { validateUsername } from '@/bounded-contexts/identity/domain/user'
 import { User } from '@/prisma/client'
 import { findUserByUsername } from '@/bounded-contexts/identity/infrastructure/userRepo'
 import { createSession } from '@/bounded-contexts/identity/infrastructure/sessionRepo'
-import { andThenAsync } from '@/common/types/result'
+import { andThenAsync, map } from '@/common/types/result'
 import type { Session } from '@/bounded-contexts/identity/domain/session'
 
 /**
  * Login Workflow - Application Layer
- * 
+ *
  * Orchestrates the login process:
  * 1. Validate username format (pure domain logic)
  * 2. Look up user by username (infrastructure I/O)
  * 3. Create a new session for the user (infrastructure I/O)
- * 
+ * 4. Extract the session ID as the authentication token
+ *
  * Uses railway-oriented programming with andThenAsync to chain async operations.
  */
 export const loginWorkflow = async (username: string) => {
@@ -25,5 +26,6 @@ export const loginWorkflow = async (username: string) => {
   // Chain with session creation (async action) using the user's id
   const sessionResult = await andThenAsync((user: User) => createSession(user.id))(userResult)
 
-  return sessionResult
+  // Extract the token (session ID) from the session
+  return map((session: Session) => session.id)(sessionResult)
 }
