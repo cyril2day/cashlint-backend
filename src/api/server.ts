@@ -1,5 +1,6 @@
 import express from 'express'
 import cookieParser from 'cookie-parser'
+import cors from 'cors'
 import { identityRoutes } from './routes/identity'
 import { ledgerRoutes } from './routes/ledger'
 import { salesRoutes } from './routes/sales'
@@ -10,6 +11,7 @@ import { reportingRoutes } from './routes/reporting'
 const app = express()
 app.use(express.json())
 app.use(cookieParser())
+app.use(cors({ origin: true, credentials: true }))
 
 // Register context-specific routes
 app.use('/api', identityRoutes)
@@ -23,7 +25,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' })
 })
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 3001
 app.listen(PORT, () => console.log(`Server on ${PORT}`))
 
 export { app }

@@ -8,7 +8,11 @@ components:
     cookieAuth:
       type: apiKey
       in: cookie
-      name: session
+      name: sessionId
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     # Identity Context
     User:
@@ -106,16 +110,15 @@ components:
     LoginResponse:
       type: object
       properties:
-        session:
-          $ref: '#/components/schemas/Session'
-        user:
-          $ref: '#/components/schemas/User'
+        token:
+          type: string
+          description: Session ID that can be used as a Bearer token
+          example: "550e8400-e29b-41d4-a716-446655440000"
         message:
           type: string
           example: "Login successful"
       required:
-        - session
-        - user
+        - token
         - message
 
     LogoutResponse:
@@ -1060,6 +1063,7 @@ components:
 
 security:
   - cookieAuth: []
+  - bearerAuth: []
 paths:
   # Identity Context
   /api/users:
@@ -1157,7 +1161,10 @@ paths:
   /api/login:
     post:
       summary: Login with username
-      description: Create a session for the user with the given username. If the username does not exist, returns an error. On success, sets a cookie named "session" with the session ID.
+      description: |-
+        Create a session for the user with the given username. If the username does not exist, returns an error.
+        On success, sets a cookie named "sessionId" with the session ID and returns the session ID as a token in the response body.
+        The token can be used for subsequent requests as a Bearer token (Authorization header) or via the cookie.
       security: []
       requestBody:
         required: true
@@ -1194,7 +1201,7 @@ paths:
   /api/logout:
     post:
       summary: Logout (invalidate session)
-      description: Invalidate the current session by clearing the session cookie. Requires a valid session cookie.
+      description: Invalidate the current session by clearing the session cookie (sessionId). Requires a valid session cookie or Bearer token.
       responses:
         '200':
           description: Logout successful
