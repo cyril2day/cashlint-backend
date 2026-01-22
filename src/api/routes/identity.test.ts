@@ -77,7 +77,7 @@ describe('Identity Context: API Routes (Integration)', () => {
         .expect(400)
 
       expect(response.body.error.type).toBe('ApplicationFailure')
-      expect(response.body.error.message).toMatch(/Username is required/)
+      expect(response.body.error.message).toBe('username is required and must be a string')
     })
 
     it('should reject non-string username', async () => {
@@ -89,7 +89,7 @@ describe('Identity Context: API Routes (Integration)', () => {
         .expect(400)
 
       expect(response.body.error.type).toBe('ApplicationFailure')
-      expect(response.body.error.message).toMatch(/Username is required/)
+      expect(response.body.error.message).toBe('username is required and must be a string')
     })
 
     it('should reject usernames shorter than 3 characters', async () => {

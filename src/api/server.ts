@@ -1,4 +1,5 @@
 import express from 'express'
+import cookieParser from 'cookie-parser'
 import { identityRoutes } from './routes/identity'
 import { ledgerRoutes } from './routes/ledger'
 import { salesRoutes } from './routes/sales'
@@ -8,6 +9,7 @@ import { reportingRoutes } from './routes/reporting'
 
 const app = express()
 app.use(express.json())
+app.use(cookieParser())
 
 // Register context-specific routes
 app.use('/api', identityRoutes)
